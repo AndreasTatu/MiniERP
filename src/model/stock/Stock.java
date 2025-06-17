@@ -70,7 +70,7 @@ public class Stock {
 
     @Override
     public boolean equals(Object o) {
-        if(this == o) return true;
+        if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Stock stock = (Stock) o;
         return Objects.equals(locationID, stock.locationID);
