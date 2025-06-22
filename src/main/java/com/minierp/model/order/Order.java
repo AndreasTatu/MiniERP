@@ -1,4 +1,4 @@
-package minierp.model.order;
+package com.minierp.model.order;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

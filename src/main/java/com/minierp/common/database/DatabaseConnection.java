@@ -1,4 +1,4 @@
-package minierp.common.database;
+package com.minierp.common.database;
 
 // Importiert JDBC-Klassen für SQL-Verbindung
 import java.sql.Connection;

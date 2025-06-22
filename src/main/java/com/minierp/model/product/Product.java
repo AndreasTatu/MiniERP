@@ -1,4 +1,4 @@
-package minierp.model.product;
+package com.minierp.model.product;
 
 import java.math.BigDecimal;
 import java.util.Objects;

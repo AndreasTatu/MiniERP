@@ -1,4 +1,4 @@
-package minierp.common.exceptions;
+package com.minierp.common.exceptions;
 
 public class CustomerAlreadyExistsException extends RuntimeException {
     public CustomerAlreadyExistsException(String message) {

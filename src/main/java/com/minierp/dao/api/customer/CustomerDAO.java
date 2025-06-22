@@ -1,8 +1,8 @@
-package minierp.dao.api.customer;
+package com.minierp.dao.api.customer;
 
-import minierp.common.exceptions.CustomerAlreadyExistsException;
-import minierp.common.exceptions.CustomerNotFoundException;
-import minierp.model.customer.Customer;
+import com.minierp.common.exceptions.CustomerAlreadyExistsException;
+import com.minierp.common.exceptions.CustomerNotFoundException;
+import com.minierp.model.customer.Customer;
 
 import java.sql.SQLException;
 import java.util.List;
