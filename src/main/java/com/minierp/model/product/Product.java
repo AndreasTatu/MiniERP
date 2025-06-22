@@ -10,6 +10,7 @@ public class Product {
     private String description;
     private BigDecimal weight;
     private BigDecimal price;
+    private boolean active = true;
 
     public Product(String name, String description, BigDecimal weight, BigDecimal price) {
         this.name = name;
@@ -54,6 +55,14 @@ public class Product {
         this.price = price;
     }
 
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
     @Override
     public String toString() {
         return "Product{" +
@@ -62,6 +71,7 @@ public class Product {
                 ", description='" + description + '\'' +
                 ", weight=" + weight +
                 ", price=" + price +
+                ", active=" + active +
                 '}';
     }
 

@@ -1,4 +1,4 @@
-package com.minierp.dao.api.customer;
+package com.minierp.dao.api;
 
 import com.minierp.common.exceptions.CustomerAlreadyExistsException;
 import com.minierp.common.exceptions.CustomerNotFoundException;
