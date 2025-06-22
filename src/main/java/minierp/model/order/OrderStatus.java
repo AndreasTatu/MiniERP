@@ -1,4 +1,4 @@
-package model.order;
+package minierp.model.order;
 
 public enum OrderStatus {
     PENDING("Ausstehend"),

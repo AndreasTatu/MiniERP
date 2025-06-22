@@ -1,4 +1,4 @@
-package model.order;
+package minierp.model.order;
 
 import java.math.BigDecimal;
 import java.util.Objects;

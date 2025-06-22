@@ -1,4 +1,4 @@
-package model.customer;
+package minierp.model.customer;
 
 import java.time.LocalDate;
 import java.util.Objects;

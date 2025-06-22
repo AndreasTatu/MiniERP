@@ -1,4 +1,4 @@
-package model.stock;
+package minierp.model.stock;
 
 import java.util.Objects;
 
