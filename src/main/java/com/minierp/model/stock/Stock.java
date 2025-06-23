@@ -10,6 +10,7 @@ public class Stock {
     int min_Stock;
     int max_Stock;
     int reserved;
+    boolean active = true;
 
     public Stock(String locationID, int productID, int quantity, int min_Stock, int max_Stock, int reserved) {
         this.locationID = locationID;
@@ -68,6 +69,14 @@ public class Stock {
         this.reserved = reserved;
     }
 
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -90,6 +99,7 @@ public class Stock {
                 ", min_Stock=" + min_Stock +
                 ", max_Stock=" + max_Stock +
                 ", reserved=" + reserved +
+                ", active=" + active +
                 '}';
     }
 }

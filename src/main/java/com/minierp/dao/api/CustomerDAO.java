@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface CustomerDAO {
 
-    //CRUD-Methoden:
+    //CRUD-Methods:
 
     //create
     void createCustomer(Customer customer) throws CustomerAlreadyExistsException, SQLException;

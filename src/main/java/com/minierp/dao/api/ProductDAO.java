@@ -25,5 +25,6 @@ public interface ProductDAO {
 
     //delete
     void deactivateProduct(int productID) throws ProductNotFoundException, SQLException;
+    void reactivateProduct(int productID) throws ProductNotFoundException, SQLException;
 
 }
