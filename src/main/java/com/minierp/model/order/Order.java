@@ -8,15 +8,15 @@ public class Order {
 
     private int orderID;
     private int customerID;
-    private LocalDateTime orderDate;
+    private LocalDateTime orderDateTime;
     private BigDecimal discount;
     private BigDecimal tax;
     private BigDecimal totalPrice;
     private OrderStatus orderStatus = OrderStatus.PENDING; //default status
 
-    public Order(int customerID, LocalDateTime orderDate, BigDecimal discount, BigDecimal tax, BigDecimal totalPrice) {
+    public Order(int customerID, LocalDateTime orderDateTime, BigDecimal discount, BigDecimal tax, BigDecimal totalPrice) {
         this.customerID = customerID;
-        this.orderDate = orderDate;
+        this.orderDateTime = orderDateTime;
         this.discount = discount;
         this.tax = tax;
         this.totalPrice = totalPrice;
@@ -30,8 +30,8 @@ public class Order {
         return customerID;
     }
 
-    public LocalDateTime getOrderDate() {
-        return orderDate;
+    public LocalDateTime getOrderDateTime() {
+        return orderDateTime;
     }
 
     public BigDecimal getDiscount() {
@@ -71,12 +71,12 @@ public class Order {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Order order = (Order) o;
-        return customerID == order.customerID && Objects.equals(orderDate, order.orderDate);
+        return customerID == order.customerID && Objects.equals(orderDateTime, order.orderDateTime);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(customerID, orderDate);
+        return Objects.hash(customerID, orderDateTime);
     }
 
 }
