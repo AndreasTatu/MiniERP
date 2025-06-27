@@ -1,6 +1,5 @@
 package com.minierp.dao.api;
 
-import com.minierp.common.exceptions.CustomerNotFoundException;
 import com.minierp.common.exceptions.OrderNotFoundException;
 import com.minierp.model.order.Order;
 import com.minierp.model.order.OrderItem;
@@ -25,9 +24,7 @@ public interface OrderDAO {
 
     //update
     void updateOrder(Order order) throws OrderNotFoundException, SQLException;
-    void cancelOrder(Order order) throws OrderNotFoundException, SQLException;
-
-
+    void cancelOrder(int orderID) throws OrderNotFoundException, SQLException;
 
 
 }
