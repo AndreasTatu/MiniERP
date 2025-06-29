@@ -21,6 +21,16 @@ public class Customer {
         this.phone = phone;
     }
 
+    public Customer(int customerID, String name, String address, LocalDate birthdate, String email, String phone, boolean active) {
+        this.customerID = customerID;
+        this.name = name;
+        this.address = address;
+        this.birthdate = birthdate;
+        this.email = email;
+        this.phone = phone;
+        this.active = active;
+    }
+
     public int getCustomerID() {
         return customerID;
     }

@@ -7,6 +7,7 @@ import com.minierp.dao.api.CustomerDAO;
 import com.minierp.model.customer.Customer;
 
 import java.sql.*;
+import java.time.LocalDate;
 import java.util.List;
 
 public class CustomerDAOImpl implements CustomerDAO {
@@ -58,7 +59,32 @@ public class CustomerDAOImpl implements CustomerDAO {
     //read
     @Override
     public Customer findCustomerByID(int customerID) throws CustomerNotFoundException, SQLException{
+        String findSQL = "SELECT * FROM customers WHERE customerID = ?";
 
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+
+            findStmt.setInt(1, customerID);
+            try(ResultSet rs = findStmt.executeQuery()) {
+                if(!rs.next()){
+                    throw new CustomerNotFoundException("Customer not found.");
+                }
+
+                // Extract all columns from ResultSet: customerID, name, address, birthdate, email, phone, active
+                LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+
+            Customer customer = new Customer(
+                    rs.getInt("customerID"),
+                    rs.getString("name"),
+                    rs.getString("address"),
+                    birthdate,
+                    rs.getString("email"),
+                    rs.getString("phone"),
+                    rs.getBoolean("active"));
+
+                return customer;
+            }
+        }
     }
 
 
