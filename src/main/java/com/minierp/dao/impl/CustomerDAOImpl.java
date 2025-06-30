@@ -8,6 +8,7 @@ import com.minierp.model.customer.Customer;
 
 import java.sql.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 public class CustomerDAOImpl implements CustomerDAO {
@@ -59,6 +60,7 @@ public class CustomerDAOImpl implements CustomerDAO {
     //read
     @Override
     public Customer findCustomerByID(int customerID) throws CustomerNotFoundException, SQLException{
+
         String findSQL = "SELECT * FROM customers WHERE customerID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
@@ -67,7 +69,7 @@ public class CustomerDAOImpl implements CustomerDAO {
             findStmt.setInt(1, customerID);
             try(ResultSet rs = findStmt.executeQuery()) {
                 if(!rs.next()){
-                    throw new CustomerNotFoundException("Customer not found.");
+                    throw new CustomerNotFoundException("Customer not found by customerID.");
                 }
 
                 // Extract all columns from ResultSet: customerID, name, address, birthdate, email, phone, active
@@ -92,6 +94,33 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public Customer findCustomerByEmail(String email) throws CustomerNotFoundException, SQLException{
 
+        String findSQL = "SELECT * FROM customers WHERE email = ?";
+
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+
+            findStmt.setString(1, email);
+
+            try(ResultSet rs = findStmt.executeQuery()) {
+
+                if(!rs.next()){
+                    throw new CustomerNotFoundException("Customer not found by Email.");
+                }
+                // Extract all columns from ResultSet: customerID, name, address, birthdate, email, phone, active
+                LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+
+                Customer customer = new Customer(
+                        rs.getInt("customerID"),
+                        rs.getString("name"),
+                        rs.getString("address"),
+                        birthdate,
+                        rs.getString("email"),
+                        rs.getString("phone"),
+                        rs.getBoolean("active"));
+
+                return customer;
+            }
+        }
     }
 
 
@@ -99,6 +128,33 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public List<Customer> findCustomerByNameContaining(String namePattern) throws SQLException{
 
+        String findSQL = "SELECT * FROM customers WHERE name LIKE ? AND active = true";
+        List<Customer> customerList = new ArrayList<>();
+
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+
+            findStmt.setString(1,"%" + namePattern + "%");
+
+            try(ResultSet rs = findStmt.executeQuery()) {
+                while(rs.next()){
+
+                    LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+
+                    Customer customer = new Customer(
+                            rs.getInt("customerID"),
+                            rs.getString("name"),
+                            rs.getString("address"),
+                            birthdate,
+                            rs.getString("email"),
+                            rs.getString("phone"),
+                            rs.getBoolean("active"));
+
+                    customerList.add(customer);
+                }
+                return customerList;
+            }
+        }
     }
 
 
@@ -106,6 +162,31 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public List<Customer> findAllActiveCustomers() throws SQLException{
 
+        String findSQL = "SELECT * FROM customers WHERE active = true";
+        List<Customer> customerList = new ArrayList<>();
+
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+
+            try(ResultSet rs = findStmt.executeQuery()) {
+                while(rs.next()){
+
+                    LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+
+                    Customer customer = new Customer(
+                            rs.getInt("customerID"),
+                            rs.getString("name"),
+                            rs.getString("address"),
+                            birthdate,
+                            rs.getString("email"),
+                            rs.getString("phone"),
+                            rs.getBoolean("active"));
+
+                    customerList.add(customer);
+                }
+                return customerList;
+            }
+        }
     }
 
 
@@ -113,6 +194,31 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public List<Customer> findAllCustomers() throws SQLException{
 
+        String findSQL = "SELECT * FROM customers";
+        List<Customer> customerList = new ArrayList<>();
+
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+
+            try(ResultSet rs = findStmt.executeQuery()) {
+                while(rs.next()){
+
+                    LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+
+                    Customer customer = new Customer(
+                            rs.getInt("customerID"),
+                            rs.getString("name"),
+                            rs.getString("address"),
+                            birthdate,
+                            rs.getString("email"),
+                            rs.getString("phone"),
+                            rs.getBoolean("active"));
+
+                    customerList.add(customer);
+                }
+                return customerList;
+            }
+        }
     }
 
 
@@ -121,15 +227,46 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public void updateCustomer(Customer customer) throws CustomerNotFoundException, SQLException{
 
+        String updateSQL = "UPDATE customers SET name = ?, address = ?, birthdate = ?, email = ?, phone = ?, active = ? WHERE customerID = ?";
+
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
+
+            updateStmt.setString(1, customer.getName());
+            updateStmt.setString(2, customer.getAddress());
+            updateStmt.setDate(3, Date.valueOf(customer.getBirthdate()));
+            updateStmt.setString(4, customer.getEmail());
+            updateStmt.setString(5, customer.getPhone());
+            updateStmt.setBoolean(6, customer.isActive());
+            updateStmt.setInt(7, customer.getCustomerID());
+
+            int affectedRows = updateStmt.executeUpdate();
+            if(affectedRows == 0){
+                throw new CustomerNotFoundException("Update failed: Customer with customerID: " + customer.getCustomerID() + " not found.");
+            }
+        }
     }
 
 
 
-    //delete (soft-delete)
+    //delete (soft-delete)->setActive(false)
     @Override
     public void deactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException{
 
-    } //setActive(false)
+        String updateSQL = "UPDATE customers SET active = ? WHERE customerID = ?";
+
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
+
+            updateStmt.setBoolean(1, false);
+            updateStmt.setInt(2, customerID);
+
+            int affectedRows = updateStmt.executeUpdate();
+            if(affectedRows == 0){
+                throw new CustomerNotFoundException("Deactivation failed: Customer with customerID: " + customerID + " not found.");
+            }
+        }
+    }
 
 
 }
