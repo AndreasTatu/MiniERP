@@ -7,7 +7,7 @@ public class Product {
 
     private int productID;
     private String name;
-    private String description;
+    private String description; //nullable
     private BigDecimal weight;
     private BigDecimal price;
     private boolean active = true;

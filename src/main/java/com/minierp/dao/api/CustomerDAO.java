@@ -26,5 +26,6 @@ public interface CustomerDAO {
 
     //delete (soft-delete)
     void deactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException; //setActive(false)
+    void reactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException; //setActive(true)
 
 }

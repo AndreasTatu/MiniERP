@@ -284,4 +284,24 @@ public class CustomerDAOImpl implements CustomerDAO {
     }
 
 
+    //delete (soft-delete)->setActive(true)
+    @Override
+    public void reactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException{
+
+        String updateSQL = "UPDATE customers SET active = ? WHERE customerID = ?";
+
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
+
+            updateStmt.setBoolean(1, true);
+            updateStmt.setInt(2, customerID);
+
+            int affectedRows = updateStmt.executeUpdate();
+            if(affectedRows == 0){
+                throw new CustomerNotFoundException("Reactivation failed: Customer with customerID: " + customerID + " not found.");
+            }
+        }
+    }
+
+
 }
