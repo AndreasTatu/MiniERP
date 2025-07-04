@@ -14,18 +14,10 @@ import java.util.List;
 public class CustomerDAOImpl implements CustomerDAO {
 
     //create
-    /*  sql-statements:
-        customerAlreadyExists(email)
-        SELECT COUNT(*) FROM customers WHERE email = ?
-
-        createCustomer
-        INSERT INTO customers (name, address, birthdate, email, phone, active)
-        VALUES(?, ?, ?, ?, ?, ?)
-     */
     @Override
     public void createCustomer(Customer customer) throws CustomerAlreadyExistsException, SQLException{
         //SQL-String definition
-        String checkSQL = "SELECT COUNT(*) FROM customers WHERE email = ?";
+        String checkSQL = "SELECT 1 FROM customers WHERE LOWER(email) = LOWER(?)";
         String insertSQL = "INSERT INTO customers (name, address, birthdate, email, phone, active) VALUES(?, ?, ?, ?, ?, ?)";
 
         //try-with-resources: DB-connection, prepared-statements
@@ -36,14 +28,17 @@ public class CustomerDAOImpl implements CustomerDAO {
             checkStmt.setString(1, customer.getEmail()); //email gets inserted
             try(ResultSet rs = checkStmt.executeQuery()){             //statement gets executed and saved to rs
 
-                if (rs.next() && rs.getInt(1) > 0) {
+                if (rs.next()) {
                     throw new CustomerAlreadyExistsException("Customer with Email: " + customer.getEmail() + " already exists.");
                 }
             }
 
             insertStmt.setString(1, customer.getName());
             insertStmt.setString(2, customer.getAddress());
-            insertStmt.setDate(3, Date.valueOf(customer.getBirthdate()));
+            //nullable birthdate
+            if ((customer.getBirthdate() != null)) {
+                insertStmt.setDate(3, Date.valueOf(customer.getBirthdate()));
+            } else insertStmt.setNull(3, Types.DATE);
             insertStmt.setString(4, customer.getEmail());
             insertStmt.setString(5, customer.getPhone());
             insertStmt.setBoolean(6, customer.isActive());
@@ -69,12 +64,15 @@ public class CustomerDAOImpl implements CustomerDAO {
             findStmt.setInt(1, customerID);
             try(ResultSet rs = findStmt.executeQuery()) {
                 if(!rs.next()){
-                    throw new CustomerNotFoundException("Customer not found by customerID.");
+                    throw new CustomerNotFoundException("Customer with ID: " + customerID + "not found by customerID.");
                 }
 
-                // Extract all columns from ResultSet: customerID, name, address, birthdate, email, phone, active
-                LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+                //SQL-Date to Java-LocalDate
+                //LocalDate birthdate = rs.getDate("birthdate").toLocalDate(); //not nullable version
+                Date birthdateSQL = rs.getDate("birthdate"); //fetching SQL-Format-Date
+                LocalDate birthdate = (birthdateSQL != null) ? birthdateSQL.toLocalDate() : null; //Conditional-Operator for nullable version
 
+                // Extract all columns from ResultSet: customerID, name, address, birthdate, email, phone, active
             Customer customer = new Customer(
                     rs.getInt("customerID"),
                     rs.getString("name"),
@@ -94,7 +92,7 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public Customer findCustomerByEmail(String email) throws CustomerNotFoundException, SQLException{
 
-        String findSQL = "SELECT * FROM customers WHERE email = ?";
+        String findSQL = "SELECT * FROM customers WHERE LOWER(email) = LOWER(?)";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
@@ -104,10 +102,11 @@ public class CustomerDAOImpl implements CustomerDAO {
             try(ResultSet rs = findStmt.executeQuery()) {
 
                 if(!rs.next()){
-                    throw new CustomerNotFoundException("Customer not found by Email.");
+                    throw new CustomerNotFoundException("Customer with Email: " + email + " not found by email.");
                 }
                 // Extract all columns from ResultSet: customerID, name, address, birthdate, email, phone, active
-                LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+                Date birthdateSQL = rs.getDate("birthdate");
+                LocalDate birthdate = (birthdateSQL != null) ? birthdateSQL.toLocalDate() : null;
 
                 Customer customer = new Customer(
                         rs.getInt("customerID"),
@@ -128,7 +127,7 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public List<Customer> findCustomerByNameContaining(String namePattern) throws SQLException{
 
-        String findSQL = "SELECT * FROM customers WHERE name LIKE ? AND active = true";
+        String findSQL = "SELECT * FROM customers WHERE LOWER(name) LIKE LOWER(?) AND active = true"; //case-insensitive
         List<Customer> customerList = new ArrayList<>();
 
         try(Connection conn = DatabaseConnection.getConnection();
@@ -139,7 +138,8 @@ public class CustomerDAOImpl implements CustomerDAO {
             try(ResultSet rs = findStmt.executeQuery()) {
                 while(rs.next()){
 
-                    LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+                    Date birthdateSQL = rs.getDate("birthdate");
+                    LocalDate birthdate = (birthdateSQL != null) ? birthdateSQL.toLocalDate() : null;
 
                     Customer customer = new Customer(
                             rs.getInt("customerID"),
@@ -171,7 +171,8 @@ public class CustomerDAOImpl implements CustomerDAO {
             try(ResultSet rs = findStmt.executeQuery()) {
                 while(rs.next()){
 
-                    LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+                    Date birthdateSQL = rs.getDate("birthdate");
+                    LocalDate birthdate = (birthdateSQL != null) ? birthdateSQL.toLocalDate() : null;
 
                     Customer customer = new Customer(
                             rs.getInt("customerID"),
@@ -203,7 +204,8 @@ public class CustomerDAOImpl implements CustomerDAO {
             try(ResultSet rs = findStmt.executeQuery()) {
                 while(rs.next()){
 
-                    LocalDate birthdate = rs.getDate("birthdate").toLocalDate();
+                    Date birthdateSQL = rs.getDate("birthdate");
+                    LocalDate birthdate = (birthdateSQL != null) ? birthdateSQL.toLocalDate() : null;
 
                     Customer customer = new Customer(
                             rs.getInt("customerID"),
@@ -225,16 +227,29 @@ public class CustomerDAOImpl implements CustomerDAO {
 
     //update
     @Override
-    public void updateCustomer(Customer customer) throws CustomerNotFoundException, SQLException{
+    public void updateCustomer(Customer customer) throws CustomerNotFoundException, CustomerAlreadyExistsException, SQLException{
 
+        String checkSQL = "SELECT 1 FROM customers WHERE LOWER(email) = LOWER(?) and customerID != ?";
         String updateSQL = "UPDATE customers SET name = ?, address = ?, birthdate = ?, email = ?, phone = ?, active = ? WHERE customerID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
             PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
+
+            checkStmt.setString(1, customer.getEmail());
+            checkStmt.setInt(2, customer.getCustomerID());
+            try(ResultSet rs = checkStmt.executeQuery()){
+
+                if(rs.next()){
+                    throw new CustomerAlreadyExistsException("A Customer with Email: " + customer.getEmail() + " already exists. Update failed");
+                }
+            }
 
             updateStmt.setString(1, customer.getName());
             updateStmt.setString(2, customer.getAddress());
-            updateStmt.setDate(3, Date.valueOf(customer.getBirthdate()));
+            if(customer.getBirthdate() == null){
+                updateStmt.setNull(3, Types.DATE);
+            } else updateStmt.setDate(3, Date.valueOf(customer.getBirthdate()));
             updateStmt.setString(4, customer.getEmail());
             updateStmt.setString(5, customer.getPhone());
             updateStmt.setBoolean(6, customer.isActive());

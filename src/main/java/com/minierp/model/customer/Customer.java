@@ -8,7 +8,7 @@ public class Customer {
     private int customerID;
     private String name;
     private String address;
-    private LocalDate birthdate;
+    private LocalDate birthdate; //nullable
     private String email;
     private String phone;
     private boolean active = true;
