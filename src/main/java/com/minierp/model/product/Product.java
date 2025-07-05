@@ -12,6 +12,15 @@ public class Product {
     private BigDecimal price;
     private boolean active = true;
 
+    public Product(int productID, String name, String description, BigDecimal weight, BigDecimal price, boolean active) {
+        this.productID = productID;
+        this.name = name;
+        this.description = description;
+        this.weight = weight;
+        this.price = price;
+        this.active = active;
+    }
+
     public Product(String name, String description, BigDecimal weight, BigDecimal price) {
         this.name = name;
         this.description = description;
@@ -79,12 +88,11 @@ public class Product {
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
         Product product = (Product) o;
-        return Objects.equals(name, product.name) &&
-               Objects.equals(description, product.description);
+        return Objects.equals(name, product.name);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, description);
+        return Objects.hash(name);
     }
 }

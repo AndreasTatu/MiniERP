@@ -241,7 +241,7 @@ public class CustomerDAOImpl implements CustomerDAO {
             try(ResultSet rs = checkStmt.executeQuery()){
 
                 if(rs.next()){
-                    throw new CustomerAlreadyExistsException("A Customer with Email: " + customer.getEmail() + " already exists. Update failed");
+                    throw new CustomerAlreadyExistsException("Customer with Email: " + customer.getEmail() + " found. Update failed");
                 }
             }
 
@@ -257,7 +257,7 @@ public class CustomerDAOImpl implements CustomerDAO {
 
             int affectedRows = updateStmt.executeUpdate();
             if(affectedRows == 0){
-                throw new CustomerNotFoundException("Update failed: Customer with customerID: " + customer.getCustomerID() + " not found.");
+                throw new CustomerNotFoundException("Customer with customerID: " + customer.getCustomerID() + " not found for update.");
             }
         }
     }
