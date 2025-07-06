@@ -15,16 +15,16 @@ public interface StockDAO {
     void createStock(Stock stock) throws StockAlreadyExistsException, SQLException;
 
     // Read
-    Stock findStockByLocationID(String locationID) throws StockNotFoundException, SQLException;
+    Stock findStockByStockID(int stockID) throws StockNotFoundException, SQLException;
     List<Stock> findStockByProductID(int productID) throws SQLException;
     List<Stock> findAllActiveStock() throws SQLException;
     List<Stock> findAllStock() throws SQLException;
 
     // Update
     void updateFullStock(Stock stock) throws StockNotFoundException, SQLException;
-    void updateStockQuantityAndReserved(String locationID, int quantity, int reserved) throws StockNotFoundException, SQLException;
+    void updateStockQuantityAndReserved(int stockID, int quantity, int reserved) throws StockNotFoundException, SQLException;
 
     // Delete (Soft Delete)
-    void deactivateStock(String locationID) throws StockNotFoundException, SQLException;
-    void reactivateStock(String locationID) throws StockNotFoundException, SQLException;
+    void deactivateStock(int stockID) throws StockNotFoundException, SQLException;
+    void reactivateStock(int stockID) throws StockNotFoundException, SQLException;
 }
