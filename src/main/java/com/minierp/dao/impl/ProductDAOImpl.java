@@ -18,8 +18,8 @@ public class ProductDAOImpl implements ProductDAO {
     public void createProduct(Product product) throws ProductAlreadyExistsException, SQLException{
 
         //SQL-String definition
-        String checkSQL = "SELECT 1 FROM products WHERE LOWER(name) = LOWER(?)";
-        String insertSQL = "INSERT INTO products (name, description, weight, price, active) VALUES(?, ?, ?, ?, ?)";
+        final String checkSQL = "SELECT 1 FROM products WHERE LOWER(name) = LOWER(?)";
+        final String insertSQL = "INSERT INTO products (name, description, weight, price, active) VALUES(?, ?, ?, ?, ?)";
 
         //try-with-resources: DB-connection, prepared-statements
         try(Connection conn = DatabaseConnection.getConnection();
@@ -65,7 +65,7 @@ public class ProductDAOImpl implements ProductDAO {
     @Override
     public Product findProductByID(int productID) throws ProductNotFoundException, SQLException{
 
-        String findSQL = "SELECT * FROM products WHERE productID = ?";
+        final String findSQL = "SELECT * FROM products WHERE productID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
@@ -85,7 +85,7 @@ public class ProductDAOImpl implements ProductDAO {
     @Override
     public Product findProductByName(String name) throws ProductNotFoundException, SQLException{
 
-        String findSQL = "SELECT * FROM products WHERE LOWER(name) = LOWER(?)";
+        final String findSQL = "SELECT * FROM products WHERE LOWER(name) = LOWER(?)";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)){
@@ -105,8 +105,8 @@ public class ProductDAOImpl implements ProductDAO {
     @Override
     public List<Product> findAllActiveProducts() throws SQLException{
 
-        String findSQL = "SELECT * FROM products WHERE active = true";
-        List<Product> productList = new ArrayList<>();
+        final String findSQL = "SELECT * FROM products WHERE active = true";
+        final List<Product> productList = new ArrayList<>();
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)){
@@ -124,8 +124,8 @@ public class ProductDAOImpl implements ProductDAO {
     @Override
     public List<Product> findAllProducts() throws SQLException{
 
-        String findSQL = "SELECT * FROM products";
-        List<Product> productList = new ArrayList<>();
+        final String findSQL = "SELECT * FROM products";
+        final List<Product> productList = new ArrayList<>();
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)){
@@ -144,8 +144,8 @@ public class ProductDAOImpl implements ProductDAO {
     @Override
     public void updateProduct(Product product) throws ProductNotFoundException, SQLException{
 
-        String checkSQL = "SELECT 1 FROM products WHERE LOWER(name) = LOWER(?) AND productID != ?";
-        String updateSQL = "UPDATE products SET name = ?, description = ?, weight = ?, price = ?, active = ? WHERE productID = ?";
+        final String checkSQL = "SELECT 1 FROM products WHERE LOWER(name) = LOWER(?) AND productID != ?";
+        final String updateSQL = "UPDATE products SET name = ?, description = ?, weight = ?, price = ?, active = ? WHERE productID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
@@ -179,7 +179,7 @@ public class ProductDAOImpl implements ProductDAO {
     @Override
     public void deactivateProduct(int productID) throws ProductNotFoundException, SQLException{
 
-        String updateSQL = "UPDATE products SET active = ? WHERE productID = ?";
+        final String updateSQL = "UPDATE products SET active = ? WHERE productID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
@@ -198,7 +198,7 @@ public class ProductDAOImpl implements ProductDAO {
     @Override
     public void reactivateProduct(int productID) throws ProductNotFoundException, SQLException{
 
-        String updateSQL = "UPDATE products SET active = ? WHERE productID = ?";
+        final String updateSQL = "UPDATE products SET active = ? WHERE productID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {

@@ -1,5 +1,6 @@
 package com.minierp.dao.api;
 
+import com.minierp.common.exceptions.ProductNotFoundException;
 import com.minierp.common.exceptions.StockAlreadyExistsException;
 import com.minierp.common.exceptions.StockNotFoundException;
 import com.minierp.model.stock.Stock;
@@ -21,7 +22,7 @@ public interface StockDAO {
     List<Stock> findAllStock() throws SQLException;
 
     // Update
-    void updateFullStock(Stock stock) throws StockNotFoundException, SQLException;
+    void updateFullStock(Stock stock) throws StockNotFoundException, ProductNotFoundException, SQLException;
     void updateStockQuantityAndReserved(int stockID, int quantity, int reserved) throws StockNotFoundException, SQLException;
 
     // Delete (Soft Delete)
