@@ -17,8 +17,8 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public void createCustomer(Customer customer) throws CustomerAlreadyExistsException, SQLException{
         //SQL-String definition
-        String checkSQL = "SELECT 1 FROM customers WHERE LOWER(email) = LOWER(?)";
-        String insertSQL = "INSERT INTO customers (name, address, birthdate, email, phone, active) VALUES(?, ?, ?, ?, ?, ?)";
+        final String checkSQL = "SELECT 1 FROM customers WHERE LOWER(email) = LOWER(?)";
+        final String insertSQL = "INSERT INTO customers (name, address, birthdate, email, phone, active) VALUES(?, ?, ?, ?, ?, ?)";
 
         //try-with-resources: DB-connection, prepared-statements
         try(Connection conn = DatabaseConnection.getConnection();
@@ -56,7 +56,7 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public Customer findCustomerByID(int customerID) throws CustomerNotFoundException, SQLException{
 
-        String findSQL = "SELECT * FROM customers WHERE customerID = ?";
+        final String findSQL = "SELECT * FROM customers WHERE customerID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
@@ -92,7 +92,7 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public Customer findCustomerByEmail(String email) throws CustomerNotFoundException, SQLException{
 
-        String findSQL = "SELECT * FROM customers WHERE LOWER(email) = LOWER(?)";
+        final String findSQL = "SELECT * FROM customers WHERE LOWER(email) = LOWER(?)";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
@@ -127,8 +127,8 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public List<Customer> findCustomerByNameContaining(String namePattern) throws SQLException{
 
-        String findSQL = "SELECT * FROM customers WHERE LOWER(name) LIKE LOWER(?) AND active = true"; //case-insensitive
-        List<Customer> customerList = new ArrayList<>();
+        final String findSQL = "SELECT * FROM customers WHERE LOWER(name) LIKE LOWER(?) AND active = true"; //case-insensitive
+        final List<Customer> customerList = new ArrayList<>();
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
@@ -162,8 +162,8 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public List<Customer> findAllActiveCustomers() throws SQLException{
 
-        String findSQL = "SELECT * FROM customers WHERE active = true";
-        List<Customer> customerList = new ArrayList<>();
+        final String findSQL = "SELECT * FROM customers WHERE active = true";
+        final List<Customer> customerList = new ArrayList<>();
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
@@ -195,8 +195,8 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public List<Customer> findAllCustomers() throws SQLException{
 
-        String findSQL = "SELECT * FROM customers";
-        List<Customer> customerList = new ArrayList<>();
+        final String findSQL = "SELECT * FROM customers";
+        final List<Customer> customerList = new ArrayList<>();
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
@@ -229,8 +229,8 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public void updateCustomer(Customer customer) throws CustomerNotFoundException, CustomerAlreadyExistsException, SQLException{
 
-        String checkSQL = "SELECT 1 FROM customers WHERE LOWER(email) = LOWER(?) and customerID != ?";
-        String updateSQL = "UPDATE customers SET name = ?, address = ?, birthdate = ?, email = ?, phone = ?, active = ? WHERE customerID = ?";
+        final String checkSQL = "SELECT 1 FROM customers WHERE LOWER(email) = LOWER(?) and customerID != ?";
+        final String updateSQL = "UPDATE customers SET name = ?, address = ?, birthdate = ?, email = ?, phone = ?, active = ? WHERE customerID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
@@ -268,7 +268,7 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public void deactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException{
 
-        String updateSQL = "UPDATE customers SET active = ? WHERE customerID = ?";
+        final String updateSQL = "UPDATE customers SET active = ? WHERE customerID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
@@ -288,7 +288,7 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public void reactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException{
 
-        String updateSQL = "UPDATE customers SET active = ? WHERE customerID = ?";
+        final String updateSQL = "UPDATE customers SET active = ? WHERE customerID = ?";
 
         try(Connection conn = DatabaseConnection.getConnection();
             PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {

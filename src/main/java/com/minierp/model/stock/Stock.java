@@ -8,28 +8,28 @@ public class Stock {
     int productID; //FK from products
     String location; //in form of: A-01-02
     int quantity;
-    int min_Stock;
-    int max_Stock;
+    int minStock;
+    int maxStock;
     int reserved;
     boolean active = true;
 
-    public Stock(int stockID, int productID, String location, int quantity, int min_Stock, int max_Stock, int reserved, boolean active) {
+    public Stock(int stockID, int productID, String location, int quantity, int minStock, int maxStock, int reserved, boolean active) {
         this.stockID = stockID;
         this.productID = productID;
         this.location = location;
         this.quantity = quantity;
-        this.min_Stock = min_Stock;
-        this.max_Stock = max_Stock;
+        this.minStock = minStock;
+        this.maxStock = maxStock;
         this.reserved = reserved;
         this.active = active;
     }
 
-    public Stock(int productID, String location, int quantity, int min_Stock, int max_Stock, int reserved, boolean active) {
+    public Stock(int productID, String location, int quantity, int minStock, int maxStock, int reserved, boolean active) {
         this.productID = productID;
         this.location = location;
         this.quantity = quantity;
-        this.min_Stock = min_Stock;
-        this.max_Stock = max_Stock;
+        this.minStock = minStock;
+        this.maxStock = maxStock;
         this.reserved = reserved;
         this.active = active;
     }
@@ -66,20 +66,20 @@ public class Stock {
         this.quantity = quantity;
     }
 
-    public int getMin_Stock() {
-        return min_Stock;
+    public int getMinStock() {
+        return minStock;
     }
 
-    public void setMin_Stock(int min_Stock) {
-        this.min_Stock = min_Stock;
+    public void setMinStock(int minStock) {
+        this.minStock = minStock;
     }
 
-    public int getMax_Stock() {
-        return max_Stock;
+    public int getMaxStock() {
+        return maxStock;
     }
 
-    public void setMax_Stock(int max_Stock) {
-        this.max_Stock = max_Stock;
+    public void setMaxStock(int maxStock) {
+        this.maxStock = maxStock;
     }
 
     public int getReserved() {
@@ -117,8 +117,8 @@ public class Stock {
                 ", productID=" + productID +
                 ", location='" + location + '\'' +
                 ", quantity=" + quantity +
-                ", min_Stock=" + min_Stock +
-                ", max_Stock=" + max_Stock +
+                ", minStock=" + minStock +
+                ", maxStock=" + maxStock +
                 ", reserved=" + reserved +
                 ", active=" + active +
                 '}';
