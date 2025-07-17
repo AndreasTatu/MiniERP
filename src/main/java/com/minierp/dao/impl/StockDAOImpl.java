@@ -188,27 +188,92 @@ public class StockDAOImpl implements StockDAO {
 
 
 
+    @Override
     public void updateStockQuantityAndReserved(int stockID, int quantity, int reserved) throws StockNotFoundException, SQLException{
 
+        final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET quantity = ?, reserved = ? WHERE stockID = ?";
 
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)){
 
+            //existence check
+            checkStmt.setInt(1, stockID);
+            try(ResultSet rs = checkStmt.executeQuery()){
+                if (!rs.next()){
+                    throw new StockNotFoundException("Update failed: stock with ID: " + stockID + " not found.");
+                }
+            }
+            //perform update
+            updateStmt.setInt(1, quantity);
+            updateStmt.setInt(2, reserved);
+            updateStmt.setInt(3, stockID);
+
+            int affectedRows = updateStmt.executeUpdate();
+            if (affectedRows == 0){
+                throw new SQLException("Update failed: no Rows affected.");
+            }
+        }
     }
 
 
 
     // Delete (Soft Delete)
+    @Override
     public void deactivateStock(int stockID) throws StockNotFoundException, SQLException{
 
+        final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET active = false WHERE stockID = ?";
 
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)){
 
+            //existence check
+            checkStmt.setInt(1, stockID);
+            try(ResultSet rs = checkStmt.executeQuery()){
+                if (!rs.next()){
+                    throw new StockNotFoundException("Deactivation failed: stock with ID: " + stockID + " not found.");
+                }
+            }
+            //perform update
+            updateStmt.setInt(1, stockID);
+
+            int affectedRows = updateStmt.executeUpdate();
+            if (affectedRows == 0){
+                throw new SQLException("Deactivation failed: no Rows affected.");
+            }
+        }
     }
 
 
 
+    @Override
     public void reactivateStock(int stockID) throws StockNotFoundException, SQLException{
 
+        final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET active = false WHERE stockID = ?";
 
+        try(Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)){
 
+            //existence check
+            checkStmt.setInt(1, stockID);
+            try(ResultSet rs = checkStmt.executeQuery()){
+                if (!rs.next()){
+                    throw new StockNotFoundException("Reactivation failed: stock with ID: " + stockID + " not found.");
+                }
+            }
+            //perform update
+            updateStmt.setInt(1, stockID);
+
+            int affectedRows = updateStmt.executeUpdate();
+            if (affectedRows == 0){
+                throw new SQLException("Reactivation failed: no Rows affected.");
+            }
+        }
     }
 
 

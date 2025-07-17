@@ -14,6 +14,16 @@ public class Order {
     private BigDecimal totalPrice;
     private OrderStatus orderStatus = OrderStatus.PENDING; //default status
 
+    public Order(int orderID, int customerID, LocalDateTime orderDateTime, BigDecimal discount, BigDecimal tax, BigDecimal totalPrice, OrderStatus orderStatus) {
+        this.orderID = orderID;
+        this.customerID = customerID;
+        this.orderDateTime = orderDateTime;
+        this.discount = discount;
+        this.tax = tax;
+        this.totalPrice = totalPrice;
+        this.orderStatus = orderStatus;
+    }
+
     public Order(int customerID, LocalDateTime orderDateTime, BigDecimal discount, BigDecimal tax, BigDecimal totalPrice) {
         this.customerID = customerID;
         this.orderDateTime = orderDateTime;
