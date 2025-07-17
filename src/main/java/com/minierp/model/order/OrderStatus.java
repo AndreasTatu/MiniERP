@@ -1,11 +1,11 @@
 package com.minierp.model.order;
 
 public enum OrderStatus {
-    PENDING("Ausstehend"),
-    CONFIRMED("Bestätigt"),
-    SHIPPED("Versendet"),
-    DELIVERED("Geliefert"),
-    CANCELLED("Storniert");
+    PENDING("PENDING"),
+    CONFIRMED("CONFIRMED"),
+    SHIPPED("SHIPPED"),
+    DELIVERED("DELIVERED"),
+    CANCELLED("CANCELLED");
 
 
     private final String displayName;

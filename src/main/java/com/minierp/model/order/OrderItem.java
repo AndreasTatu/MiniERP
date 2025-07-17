@@ -18,6 +18,14 @@ public class OrderItem {
         this.unitPrice = unitPrice;
     }
 
+    public OrderItem(int orderItemID, int orderID, int productID, int quantity, BigDecimal unitPrice) {
+        this.orderItemID = orderItemID;
+        this.orderID = orderID;
+        this.productID = productID;
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+    }
+
     public int getOrderItemID() {
         return orderItemID;
     }
