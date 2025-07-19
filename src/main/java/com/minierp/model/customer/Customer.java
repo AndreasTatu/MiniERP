@@ -31,6 +31,10 @@ public class Customer {
         this.active = active;
     }
 
+    public Customer() {
+        // for Tests, Setter, Mapping
+    }
+
     public int getCustomerID() {
         return customerID;
     }

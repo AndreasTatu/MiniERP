@@ -49,6 +49,15 @@ public class TestDatabaseConnection {
                     orderStatus VARCHAR(50) NOT NULL,
                     FOREIGN KEY (customerID) REFERENCES customers(customerID)
                 );
+                
+                 CREATE TABLE products (
+                    productID INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    description VARCHAR(255),
+                    weight DECIMAL(10,2) NOT NULL,
+                    price DECIMAL(10,2) NOT NULL,
+                    active BOOLEAN
+                );
 
                 CREATE TABLE orderItems (
                     orderItemID INT AUTO_INCREMENT PRIMARY KEY,
@@ -59,15 +68,6 @@ public class TestDatabaseConnection {
                     FOREIGN KEY (orderID) REFERENCES orders(orderID),
                     FOREIGN KEY (productID) REFERENCES products(productID)
                 );
-
-                CREATE TABLE products (
-                    productID INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    description VARCHAR(255),
-                    weight DECIMAL(10,2) NOT NULL,
-                    price DECIMAL(10,2) NOT NULL,
-                    active BOOLEAN
-                );
                 
                 CREATE TABLE stocks (
                     stockID INT AUTO_INCREMENT PRIMARY KEY,
@@ -77,7 +77,7 @@ public class TestDatabaseConnection {
                     minStock INT,
                     maxStock INT,
                     reserved INT,
-                    active BOOLEAN
+                    active BOOLEAN,
                     UNIQUE (productID, location),
                     FOREIGN KEY (productID) REFERENCES products(productID)
                 );

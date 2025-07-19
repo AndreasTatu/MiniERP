@@ -13,6 +13,13 @@ import java.util.List;
 
 public class CustomerDAOImpl implements CustomerDAO {
 
+    //for testing:
+    private final Connection connection;
+    public CustomerDAOImpl(Connection connection) {
+        this.connection = connection;
+    }
+
+
     //create
     @Override
     public void createCustomer(Customer customer) throws CustomerAlreadyExistsException, SQLException{
@@ -21,9 +28,8 @@ public class CustomerDAOImpl implements CustomerDAO {
         final String insertSQL = "INSERT INTO customers (name, address, birthdate, email, phone, active) VALUES(?, ?, ?, ?, ?, ?)";
 
         //try-with-resources: DB-connection, prepared-statements
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement insertStmt = conn.prepareStatement(insertSQL)) {
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement insertStmt = connection.prepareStatement(insertSQL)) {
 
             checkStmt.setString(1, customer.getEmail()); //email gets inserted
             try(ResultSet rs = checkStmt.executeQuery()){             //statement gets executed and saved to rs
@@ -58,8 +64,7 @@ public class CustomerDAOImpl implements CustomerDAO {
 
         final String findSQL = "SELECT * FROM customers WHERE customerID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)) {
 
             findStmt.setInt(1, customerID);
             try(ResultSet rs = findStmt.executeQuery()) {
@@ -94,8 +99,7 @@ public class CustomerDAOImpl implements CustomerDAO {
 
         final String findSQL = "SELECT * FROM customers WHERE LOWER(email) = LOWER(?)";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)) {
 
             findStmt.setString(1, email);
 
@@ -130,8 +134,7 @@ public class CustomerDAOImpl implements CustomerDAO {
         final String findSQL = "SELECT * FROM customers WHERE LOWER(name) LIKE LOWER(?) AND active = true"; //case-insensitive
         final List<Customer> customerList = new ArrayList<>();
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)) {
 
             findStmt.setString(1,"%" + namePattern + "%");
 
@@ -165,8 +168,7 @@ public class CustomerDAOImpl implements CustomerDAO {
         final String findSQL = "SELECT * FROM customers WHERE active = true";
         final List<Customer> customerList = new ArrayList<>();
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)) {
 
             try(ResultSet rs = findStmt.executeQuery()) {
                 while(rs.next()){
@@ -198,8 +200,7 @@ public class CustomerDAOImpl implements CustomerDAO {
         final String findSQL = "SELECT * FROM customers";
         final List<Customer> customerList = new ArrayList<>();
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)) {
 
             try(ResultSet rs = findStmt.executeQuery()) {
                 while(rs.next()){
@@ -232,9 +233,8 @@ public class CustomerDAOImpl implements CustomerDAO {
         final String checkSQL = "SELECT 1 FROM customers WHERE LOWER(email) = LOWER(?) and customerID != ?";
         final String updateSQL = "UPDATE customers SET name = ?, address = ?, birthdate = ?, email = ?, phone = ?, active = ? WHERE customerID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = connection.prepareStatement(updateSQL)) {
 
             checkStmt.setString(1, customer.getEmail());
             checkStmt.setInt(2, customer.getCustomerID());
@@ -270,8 +270,7 @@ public class CustomerDAOImpl implements CustomerDAO {
 
         final String updateSQL = "UPDATE customers SET active = ? WHERE customerID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
+        try(PreparedStatement updateStmt = connection.prepareStatement(updateSQL)) {
 
             updateStmt.setBoolean(1, false);
             updateStmt.setInt(2, customerID);
@@ -290,8 +289,7 @@ public class CustomerDAOImpl implements CustomerDAO {
 
         final String updateSQL = "UPDATE customers SET active = ? WHERE customerID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
+        try(PreparedStatement updateStmt = connection.prepareStatement(updateSQL)) {
 
             updateStmt.setBoolean(1, true);
             updateStmt.setInt(2, customerID);
