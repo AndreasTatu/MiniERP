@@ -1,10 +1,9 @@
-package com.minierp.dao.impl;
+package com.minierp.dao.stock;
 
 import com.minierp.common.database.DatabaseConnection;
 import com.minierp.common.exceptions.ProductNotFoundException;
 import com.minierp.common.exceptions.StockAlreadyExistsException;
 import com.minierp.common.exceptions.StockNotFoundException;
-import com.minierp.dao.api.StockDAO;
 import com.minierp.model.stock.Stock;
 
 import java.sql.Connection;

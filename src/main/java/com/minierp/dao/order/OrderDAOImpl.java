@@ -1,8 +1,7 @@
-package com.minierp.dao.impl;
+package com.minierp.dao.order;
 
 import com.minierp.common.database.DatabaseConnection;
 import com.minierp.common.exceptions.OrderNotFoundException;
-import com.minierp.dao.api.OrderDAO;
 import com.minierp.model.order.Order;
 import com.minierp.model.order.OrderItem;
 import com.minierp.model.order.OrderStatus;

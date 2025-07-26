@@ -1,4 +1,4 @@
-package com.minierp.dao.api;
+package com.minierp.dao.customer;
 
 import com.minierp.common.exceptions.CustomerAlreadyExistsException;
 import com.minierp.common.exceptions.CustomerNotFoundException;
@@ -22,7 +22,7 @@ public interface CustomerDAO {
     List<Customer> findAllCustomers() throws SQLException;
 
     //update
-    void updateCustomer(Customer customer) throws CustomerNotFoundException, SQLException;
+    void updateCustomer(Customer customer) throws CustomerNotFoundException, CustomerAlreadyExistsException, SQLException;
 
     //delete (soft-delete)
     void deactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException; //setActive(false)

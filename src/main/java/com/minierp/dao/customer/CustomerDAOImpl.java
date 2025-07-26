@@ -1,9 +1,7 @@
-package com.minierp.dao.impl;
+package com.minierp.dao.customer;
 
-import com.minierp.common.database.DatabaseConnection;
 import com.minierp.common.exceptions.CustomerAlreadyExistsException;
 import com.minierp.common.exceptions.CustomerNotFoundException;
-import com.minierp.dao.api.CustomerDAO;
 import com.minierp.model.customer.Customer;
 
 import java.sql.*;
@@ -228,7 +226,7 @@ public class CustomerDAOImpl implements CustomerDAO {
 
     //update
     @Override
-    public void updateCustomer(Customer customer) throws CustomerNotFoundException, CustomerAlreadyExistsException, SQLException{
+    public void updateCustomer(Customer customer) throws CustomerNotFoundException, CustomerAlreadyExistsException, SQLException {
 
         final String checkSQL = "SELECT 1 FROM customers WHERE LOWER(email) = LOWER(?) and customerID != ?";
         final String updateSQL = "UPDATE customers SET name = ?, address = ?, birthdate = ?, email = ?, phone = ?, active = ? WHERE customerID = ?";

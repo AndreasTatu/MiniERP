@@ -1,7 +1,6 @@
-package com.minierp.dao.impl;
+package com.minierp.dao.customer;
 
 import com.minierp.common.database.TestDatabaseConnection;
-import com.minierp.dao.api.CustomerDAO;
 import com.minierp.model.customer.Customer;
 import org.junit.jupiter.api.*;
 import java.sql.*;

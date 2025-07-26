@@ -1,4 +1,4 @@
-package com.minierp.dao.api;
+package com.minierp.dao.stock;
 
 import com.minierp.common.exceptions.ProductNotFoundException;
 import com.minierp.common.exceptions.StockAlreadyExistsException;

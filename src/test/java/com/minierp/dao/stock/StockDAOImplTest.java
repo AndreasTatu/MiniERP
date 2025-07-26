@@ -1,4 +1,4 @@
-package com.minierp.dao.impl;
+package com.minierp.dao.stock;
 
 public class StockDAOImplTest {
 

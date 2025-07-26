@@ -1,9 +1,8 @@
-package com.minierp.dao.impl;
+package com.minierp.dao.product;
 
 import com.minierp.common.database.DatabaseConnection;
 import com.minierp.common.exceptions.ProductAlreadyExistsException;
 import com.minierp.common.exceptions.ProductNotFoundException;
-import com.minierp.dao.api.ProductDAO;
 import com.minierp.model.product.Product;
 import java.sql.*;
 import java.util.ArrayList;

@@ -1,4 +1,4 @@
-package com.minierp.dao.api;
+package com.minierp.dao.order;
 
 import com.minierp.common.exceptions.OrderNotFoundException;
 import com.minierp.model.order.Order;
