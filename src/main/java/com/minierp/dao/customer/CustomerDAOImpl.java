@@ -11,8 +11,8 @@ import java.util.List;
 
 public class CustomerDAOImpl implements CustomerDAO {
 
-    //for testing:
     private final Connection connection;
+
     public CustomerDAOImpl(Connection connection) {
         this.connection = connection;
     }
