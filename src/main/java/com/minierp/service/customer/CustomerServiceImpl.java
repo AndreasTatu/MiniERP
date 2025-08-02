@@ -26,7 +26,7 @@ public class CustomerServiceImpl implements CustomerService{
     }
 
     @Override
-    public void createCustomer(Customer customer) throws CustomerAlreadyExistsException, SQLException{
+    public void createCustomer(Customer customer) throws CustomerAlreadyExistsException{
 
         if (customer == null) {
             throw new IllegalArgumentException("Customer must not be null.");
@@ -55,23 +55,31 @@ public class CustomerServiceImpl implements CustomerService{
         }
 
         //customer gets handed to the DAO-method
-        customerDAO.createCustomer(customer);
+        try{
+        customerDAO.createCustomer(customer);}
+
+        catch (SQLException e) {
+            throw new RuntimeException("Database access error", e);}
     }
 
 
     @Override
-    public Customer findCustomerByID(int customerID) throws CustomerNotFoundException, SQLException {
+    public Customer findCustomerByID(int customerID) throws CustomerNotFoundException {
 
         if (customerID <= 0) {
             throw new IllegalArgumentException("Customer ID must be positive.");
         }
 
-        return customerDAO.findCustomerByID(customerID);
+        try{
+        return customerDAO.findCustomerByID(customerID);}
+
+        catch (SQLException e) {
+            throw new RuntimeException("Database access error", e);}
     }
 
 
     @Override
-    public Customer findCustomerByEmail(String email) throws CustomerNotFoundException, SQLException{
+    public Customer findCustomerByEmail(String email) throws CustomerNotFoundException {
 
         if(email == null || email.trim().isEmpty()){
             throw new IllegalArgumentException("Email must not be null or empty.");
@@ -83,12 +91,16 @@ public class CustomerServiceImpl implements CustomerService{
             throw new IllegalArgumentException("Invalid email format: " + email);
         }
 
-        return customerDAO.findCustomerByEmail(email);
+        try{
+        return customerDAO.findCustomerByEmail(email);}
+
+        catch (SQLException e) {
+            throw new RuntimeException("Database access error", e);}
     }
 
 
     @Override
-    public List<Customer> findCustomerByNameContaining(String namePattern) throws SQLException{
+    public List<Customer> findCustomerByNameContaining(String namePattern) {
 
         if (namePattern == null || namePattern.trim().isEmpty()){
             throw new IllegalArgumentException("NamePattern must not be null or empty.");
@@ -96,19 +108,27 @@ public class CustomerServiceImpl implements CustomerService{
 
         namePattern = namePattern.trim();
 
-        return customerDAO.findCustomerByNameContaining(namePattern);
+        try{
+        return customerDAO.findCustomerByNameContaining(namePattern);}
+
+        catch (SQLException e) {
+            throw new RuntimeException("Database access error", e);}
     }
 
 
     @Override
-    public List<Customer> findAllActiveCustomers() throws SQLException{
+    public List<Customer> findAllActiveCustomers() {
 
-        return customerDAO.findAllActiveCustomers();
+        try{
+        return customerDAO.findAllActiveCustomers();}
+
+        catch (SQLException e) {
+            throw new RuntimeException("Database access error", e);}
     }
 
 
     @Override
-    public void updateCustomer(Customer customer) throws CustomerNotFoundException, CustomerAlreadyExistsException, SQLException{
+    public void updateCustomer(Customer customer) throws CustomerNotFoundException, CustomerAlreadyExistsException {
 
         if (customer == null){
             throw new IllegalArgumentException("Customer must not be null");
@@ -132,29 +152,41 @@ public class CustomerServiceImpl implements CustomerService{
         customer.setEmail(email);
         customer.setPhone(phone);
 
-        customerDAO.updateCustomer(customer); //DAO prüft auf E-Mail-Kollision bei anderer ID
+        try{
+        customerDAO.updateCustomer(customer);} //DAO checks for E-Mail-collision with different ID
+
+        catch (SQLException e) {
+            throw new RuntimeException("Database access error", e);}
     }
 
 
     @Override
-    public void deactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException{
+    public void deactivateCustomer(int customerID) throws CustomerNotFoundException{
 
         if (customerID <= 0) {
             throw new IllegalArgumentException("Customer ID must be positive.");
         }
 
-        customerDAO.deactivateCustomer(customerID);
+        try{
+        customerDAO.deactivateCustomer(customerID);}
+
+        catch (SQLException e) {
+            throw new RuntimeException("Database access error", e);}
     }
 
 
     @Override
-    public void reactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException{
+    public void reactivateCustomer(int customerID) throws CustomerNotFoundException{
 
         if (customerID <= 0) {
             throw new IllegalArgumentException("Customer ID must be positive.");
         }
 
-        customerDAO.reactivateCustomer(customerID);
+        try{
+        customerDAO.reactivateCustomer(customerID);}
+
+        catch (SQLException e) {
+            throw new RuntimeException("Database access error", e);}
     }
 
 

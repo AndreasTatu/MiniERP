@@ -18,9 +18,8 @@ public interface CustomerService {
      *
      * @param customer The customer object to persist.
      * @throws CustomerAlreadyExistsException if a customer with the same email already exists.
-     * @throws SQLException if a database error occurs.
      */
-    void createCustomer(Customer customer) throws CustomerAlreadyExistsException, SQLException;
+    void createCustomer(Customer customer) throws CustomerAlreadyExistsException;
 
     /**
      * Retrieves a customer by their unique ID.
@@ -28,9 +27,8 @@ public interface CustomerService {
      * @param customerID The customer's ID.
      * @return The found Customer.
      * @throws CustomerNotFoundException if the customer was not found.
-     * @throws SQLException if a database error occurs.
      */
-    Customer findCustomerByID(int customerID) throws CustomerNotFoundException, SQLException;
+    Customer findCustomerByID(int customerID) throws CustomerNotFoundException;
 
 
     /**
@@ -39,9 +37,8 @@ public interface CustomerService {
      * @param email The customer's email.
      * @return The found Customer.
      * @throws CustomerNotFoundException if the customer was not found.
-     * @throws SQLException if a database error occurs.
      */
-    Customer findCustomerByEmail(String email) throws CustomerNotFoundException, SQLException;
+    Customer findCustomerByEmail(String email) throws CustomerNotFoundException;
 
 
     /**
@@ -49,18 +46,16 @@ public interface CustomerService {
      *
      * @param namePattern The search pattern (case-insensitive).
      * @return List of matching active customers.
-     * @throws SQLException if a database error occurs.
      */
-    List<Customer> findCustomerByNameContaining(String namePattern) throws SQLException;
+    List<Customer> findCustomerByNameContaining(String namePattern);
 
 
     /**
      * Retrieves only currently active customers.
      *
      * @return List of active customers.
-     * @throws SQLException if a database error occurs.
      */
-    List<Customer> findAllActiveCustomers() throws SQLException;
+    List<Customer> findAllActiveCustomers();
 
 
     /**
@@ -69,9 +64,8 @@ public interface CustomerService {
      * @param customer The customer object with updated data.
      * @throws CustomerNotFoundException if the customer does not exist.
      * @throws CustomerAlreadyExistsException if the email is used by another customer.
-     * @throws SQLException if a database error occurs.
      */
-    void updateCustomer(Customer customer) throws CustomerNotFoundException, CustomerAlreadyExistsException, SQLException;
+    void updateCustomer(Customer customer) throws CustomerNotFoundException, CustomerAlreadyExistsException;
 
 
     /**
@@ -79,10 +73,9 @@ public interface CustomerService {
      *
      * @param customerID The ID of the customer to de-/reactivate.
      * @throws CustomerNotFoundException if the customer does not exist.
-     * @throws SQLException if a database error occurs.
      */
-    void deactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException; //setActive(false)
-    void reactivateCustomer(int customerID) throws CustomerNotFoundException, SQLException; //setActive(true)
+    void deactivateCustomer(int customerID) throws CustomerNotFoundException; //setActive(false)
+    void reactivateCustomer(int customerID) throws CustomerNotFoundException; //setActive(true)
 
 
 }
