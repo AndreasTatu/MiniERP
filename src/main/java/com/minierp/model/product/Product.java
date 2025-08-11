@@ -10,22 +10,25 @@ public class Product {
     private String description; //nullable
     private BigDecimal weight;
     private BigDecimal price;
+    private int minStockThreshold;
     private boolean active = true;
 
-    public Product(int productID, String name, String description, BigDecimal weight, BigDecimal price, boolean active) {
+    public Product(int productID, String name, String description, BigDecimal weight, BigDecimal price, int minStockThreshold, boolean active) {
         this.productID = productID;
         this.name = name;
         this.description = description;
         this.weight = weight;
         this.price = price;
+        this.minStockThreshold = minStockThreshold;
         this.active = active;
     }
 
-    public Product(String name, String description, BigDecimal weight, BigDecimal price) {
+    public Product(String name, String description, BigDecimal weight, BigDecimal price, int minStockThreshold) {
         this.name = name;
         this.description = description;
         this.weight = weight;
         this.price = price;
+        this.minStockThreshold = minStockThreshold;
     }
 
     public int getProductID() {
@@ -69,6 +72,14 @@ public class Product {
         this.price = price;
     }
 
+    public int getMinStockThreshold() {
+        return minStockThreshold;
+    }
+
+    public void setMinStockThreshold(int minStockThreshold) {
+        this.minStockThreshold = minStockThreshold;
+    }
+
     public boolean isActive() {
         return active;
     }
@@ -85,6 +96,7 @@ public class Product {
                 ", description='" + description + '\'' +
                 ", weight=" + weight +
                 ", price=" + price +
+                ", minStockThreshold=" + minStockThreshold +
                 ", active=" + active +
                 '}';
     }

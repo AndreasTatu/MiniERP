@@ -8,27 +8,24 @@ public class Stock {
     int productID; //FK from products
     String location; //in form of: A-01-02
     int quantity;
-    int minStock;
     int maxStock;
     int reserved;
     boolean active = true;
 
-    public Stock(int stockID, int productID, String location, int quantity, int minStock, int maxStock, int reserved, boolean active) {
+    public Stock(int stockID, int productID, String location, int quantity, int maxStock, int reserved, boolean active) {
         this.stockID = stockID;
         this.productID = productID;
         this.location = location;
         this.quantity = quantity;
-        this.minStock = minStock;
         this.maxStock = maxStock;
         this.reserved = reserved;
         this.active = active;
     }
 
-    public Stock(int productID, String location, int quantity, int minStock, int maxStock, int reserved, boolean active) {
+    public Stock(int productID, String location, int quantity, int maxStock, int reserved, boolean active) {
         this.productID = productID;
         this.location = location;
         this.quantity = quantity;
-        this.minStock = minStock;
         this.maxStock = maxStock;
         this.reserved = reserved;
         this.active = active;
@@ -64,14 +61,6 @@ public class Stock {
 
     public void setQuantity(int quantity) {
         this.quantity = quantity;
-    }
-
-    public int getMinStock() {
-        return minStock;
-    }
-
-    public void setMinStock(int minStock) {
-        this.minStock = minStock;
     }
 
     public int getMaxStock() {
@@ -117,7 +106,6 @@ public class Stock {
                 ", productID=" + productID +
                 ", location='" + location + '\'' +
                 ", quantity=" + quantity +
-                ", minStock=" + minStock +
                 ", maxStock=" + maxStock +
                 ", reserved=" + reserved +
                 ", active=" + active +

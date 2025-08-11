@@ -1,6 +1,5 @@
 package com.minierp.dao.product;
 
-import com.minierp.common.database.DatabaseConnection;
 import com.minierp.common.exceptions.ProductAlreadyExistsException;
 import com.minierp.common.exceptions.ProductNotFoundException;
 import com.minierp.model.product.Product;
@@ -10,6 +9,12 @@ import java.util.List;
 
 public class ProductDAOImpl implements ProductDAO {
 
+    private final Connection connection;
+
+    public ProductDAOImpl(Connection connection) {
+        this.connection = connection;
+    }
+
     //CRUD-Methoden:
 
     //create
@@ -18,12 +23,11 @@ public class ProductDAOImpl implements ProductDAO {
 
         //SQL-String definition
         final String checkSQL = "SELECT 1 FROM products WHERE LOWER(name) = LOWER(?)";
-        final String insertSQL = "INSERT INTO products (name, description, weight, price, active) VALUES(?, ?, ?, ?, ?)";
+        final String insertSQL = "INSERT INTO products (name, description, weight, price, minStockThreshold, active) VALUES(?, ?, ?, ?, ?, ?)";
 
         //try-with-resources: DB-connection, prepared-statements
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement insertStmt = conn.prepareStatement(insertSQL)) {
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement insertStmt = connection.prepareStatement(insertSQL)) {
 
             checkStmt.setString(1, product.getName()); //name gets inserted
             try(ResultSet rs = checkStmt.executeQuery()){             //statement gets executed and saved to rs
@@ -40,7 +44,8 @@ public class ProductDAOImpl implements ProductDAO {
             } else insertStmt.setNull(2, Types.VARCHAR);
             insertStmt.setBigDecimal(3, product.getWeight());
             insertStmt.setBigDecimal(4, product.getPrice());
-            insertStmt.setBoolean(5, product.isActive());
+            insertStmt.setInt(5, product.getMinStockThreshold());
+            insertStmt.setBoolean(6, product.isActive());
 
             int affectedRows = insertStmt.executeUpdate();
             if (affectedRows == 0){
@@ -58,6 +63,7 @@ public class ProductDAOImpl implements ProductDAO {
                 rs.getString("description"),
                 rs.getBigDecimal("weight"),
                 rs.getBigDecimal("price"),
+                rs.getInt("minStockThreshold"),
                 rs.getBoolean("active"));
     }
 
@@ -66,8 +72,7 @@ public class ProductDAOImpl implements ProductDAO {
 
         final String findSQL = "SELECT * FROM products WHERE productID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)) {
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)) {
 
             findStmt.setInt(1, productID);
 
@@ -86,8 +91,7 @@ public class ProductDAOImpl implements ProductDAO {
 
         final String findSQL = "SELECT * FROM products WHERE LOWER(name) = LOWER(?)";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             findStmt.setString(1,name);
             try(ResultSet rs = findStmt.executeQuery()){
@@ -107,8 +111,7 @@ public class ProductDAOImpl implements ProductDAO {
         final String findSQL = "SELECT * FROM products WHERE active = true";
         final List<Product> productList = new ArrayList<>();
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             try(ResultSet rs = findStmt.executeQuery()){
                 while(rs.next()){
@@ -126,8 +129,7 @@ public class ProductDAOImpl implements ProductDAO {
         final String findSQL = "SELECT * FROM products";
         final List<Product> productList = new ArrayList<>();
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             try(ResultSet rs = findStmt.executeQuery()){
                 while(rs.next()){
@@ -141,14 +143,13 @@ public class ProductDAOImpl implements ProductDAO {
 
     //update
     @Override
-    public void updateProduct(Product product) throws ProductNotFoundException, SQLException{
+    public void updateProduct(Product product) throws ProductNotFoundException, ProductAlreadyExistsException, SQLException{
 
         final String checkSQL = "SELECT 1 FROM products WHERE LOWER(name) = LOWER(?) AND productID != ?";
-        final String updateSQL = "UPDATE products SET name = ?, description = ?, weight = ?, price = ?, active = ? WHERE productID = ?";
+        final String updateSQL = "UPDATE products SET name = ?, description = ?, weight = ?, price = ?, minStockThreshold = ?, active = ? WHERE productID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)){
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){
 
             checkStmt.setString(1, product.getName());
             checkStmt.setInt(2, product.getProductID());
@@ -163,8 +164,9 @@ public class ProductDAOImpl implements ProductDAO {
             } else updateStmt.setString(2, product.getDescription());
             updateStmt.setBigDecimal(3, product.getWeight());
             updateStmt.setBigDecimal(4, product.getPrice());
-            updateStmt.setBoolean(5, product.isActive());
-            updateStmt.setInt(6, product.getProductID());
+            updateStmt.setInt(5, product.getMinStockThreshold());
+            updateStmt.setBoolean(6, product.isActive());
+            updateStmt.setInt(7, product.getProductID());
 
             int affectedRows = updateStmt.executeUpdate();
             if(affectedRows == 0){
@@ -180,8 +182,7 @@ public class ProductDAOImpl implements ProductDAO {
 
         final String updateSQL = "UPDATE products SET active = ? WHERE productID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
+        try(PreparedStatement updateStmt = connection.prepareStatement(updateSQL)) {
 
             updateStmt.setBoolean(1, false);
             updateStmt.setInt(2, productID);
@@ -199,8 +200,7 @@ public class ProductDAOImpl implements ProductDAO {
 
         final String updateSQL = "UPDATE products SET active = ? WHERE productID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)) {
+        try(PreparedStatement updateStmt = connection.prepareStatement(updateSQL)) {
 
             updateStmt.setBoolean(1, true);
             updateStmt.setInt(2, productID);

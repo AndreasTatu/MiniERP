@@ -1,6 +1,5 @@
 package com.minierp.dao.stock;
 
-import com.minierp.common.database.DatabaseConnection;
 import com.minierp.common.exceptions.ProductNotFoundException;
 import com.minierp.common.exceptions.StockAlreadyExistsException;
 import com.minierp.common.exceptions.StockNotFoundException;
@@ -15,6 +14,12 @@ import java.util.List;
 
 public class StockDAOImpl implements StockDAO {
 
+    private final Connection connection;
+
+    public StockDAOImpl(Connection connection) {
+        this.connection = connection;
+    }
+
     //CRUD-Methods:
 
     // Create
@@ -22,11 +27,10 @@ public class StockDAOImpl implements StockDAO {
     public void createStock(Stock stock) throws StockAlreadyExistsException, SQLException{
 
         final String checkSQL = "SELECT 1 FROM stocks WHERE productID = ? AND location = ?";
-        final String insertSQL = "INSERT INTO stocks (productID, location, quantity, minStock, maxStock, reserved, active) VALUES(?, ?, ?, ?, ?, ?, ?)";
+        final String insertSQL = "INSERT INTO stocks (productID, location, quantity, maxStock, reserved, active) VALUES(?, ?, ?, ?, ?, ?)";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement insertStmt = conn.prepareStatement(insertSQL)){
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement insertStmt = connection.prepareStatement(insertSQL)){
 
             checkStmt.setInt(1, stock.getProductID());
             checkStmt.setString(2, stock.getLocation());
@@ -38,7 +42,6 @@ public class StockDAOImpl implements StockDAO {
             insertStmt.setInt(1, stock.getProductID());
             insertStmt.setString(2, stock.getLocation());
             insertStmt.setInt(3, stock.getQuantity());
-            insertStmt.setInt(4, stock.getMinStock());
             insertStmt.setInt(5, stock.getMaxStock());
             insertStmt.setInt(6, stock.getReserved());
             insertStmt.setBoolean(7, stock.isActive());
@@ -60,7 +63,6 @@ public class StockDAOImpl implements StockDAO {
                 rs.getInt("productID"),
                 rs.getString("location"),
                 rs.getInt("quantity"),
-                rs.getInt("minStock"),
                 rs.getInt("maxStock"),
                 rs.getInt("reserved"),
                 rs.getBoolean("active"));
@@ -71,8 +73,7 @@ public class StockDAOImpl implements StockDAO {
 
         final String findSQL = "SELECT * FROM stocks WHERE stockID = ?";
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try (PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             findStmt.setInt(1, stockID);
             try(ResultSet rs = findStmt.executeQuery()){
@@ -93,8 +94,7 @@ public class StockDAOImpl implements StockDAO {
         final String findSQL = "SELECT * FROM stocks WHERE productID = ? AND active = true";
 
         final List<Stock> stockList= new ArrayList<>();
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             findStmt.setInt(1, productID);
             try(ResultSet rs = findStmt.executeQuery()){
@@ -115,8 +115,7 @@ public class StockDAOImpl implements StockDAO {
         final String findSQL = "SELECT * FROM stocks WHERE active = true";
 
         final List<Stock> stockList= new ArrayList<>();
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             try(ResultSet rs = findStmt.executeQuery()){
                 while (rs.next()){
@@ -136,8 +135,7 @@ public class StockDAOImpl implements StockDAO {
         final String findSQL = "SELECT * FROM stocks";
 
         final List<Stock> stockList= new ArrayList<>();
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             try(ResultSet rs = findStmt.executeQuery()){
                 while (rs.next()){
@@ -156,11 +154,10 @@ public class StockDAOImpl implements StockDAO {
     public void updateFullStock(Stock stock) throws StockNotFoundException, ProductNotFoundException, SQLException{
 
         final String checkSQL = "SELECT 1 FROM products WHERE productID = ?";
-        final String updateSQL = "UPDATE stocks SET productID = ?, location = ?, quantity = ?, min_stock = ?, max_stock = ?, reserved = ?, active = ? WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET productID = ?, location = ?, quantity = ?, max_stock = ?, reserved = ?, active = ? WHERE stockID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)){
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){
 
             //checking if I have a valid productID from products for the stock update, before building the updateStmt
             checkStmt.setInt(1, stock.getProductID());
@@ -172,7 +169,6 @@ public class StockDAOImpl implements StockDAO {
             updateStmt.setInt(1, stock.getProductID());
             updateStmt.setString(2, stock.getLocation());
             updateStmt.setInt(3, stock.getQuantity());
-            updateStmt.setInt(4, stock.getMinStock());
             updateStmt.setInt(5, stock.getMaxStock());
             updateStmt.setInt(6, stock.getReserved());
             updateStmt.setBoolean(7, stock.isActive());
@@ -193,9 +189,8 @@ public class StockDAOImpl implements StockDAO {
         final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
         final String updateSQL = "UPDATE stocks SET quantity = ?, reserved = ? WHERE stockID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)){
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){
 
             //existence check
             checkStmt.setInt(1, stockID);
@@ -225,9 +220,8 @@ public class StockDAOImpl implements StockDAO {
         final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
         final String updateSQL = "UPDATE stocks SET active = false WHERE stockID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)){
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){
 
             //existence check
             checkStmt.setInt(1, stockID);
@@ -254,9 +248,8 @@ public class StockDAOImpl implements StockDAO {
         final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
         final String updateSQL = "UPDATE stocks SET active = false WHERE stockID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)){
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){
 
             //existence check
             checkStmt.setInt(1, stockID);

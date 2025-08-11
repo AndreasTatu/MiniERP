@@ -21,7 +21,7 @@ public interface ProductDAO {
     List<Product> findAllProducts() throws SQLException;
 
     //update
-    void updateProduct(Product product) throws ProductNotFoundException, SQLException;
+    void updateProduct(Product product) throws ProductNotFoundException, ProductAlreadyExistsException, SQLException;
 
     //delete
     void deactivateProduct(int productID) throws ProductNotFoundException, SQLException;

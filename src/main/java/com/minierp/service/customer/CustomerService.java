@@ -4,7 +4,6 @@ import com.minierp.common.exceptions.CustomerAlreadyExistsException;
 import com.minierp.common.exceptions.CustomerNotFoundException;
 import com.minierp.model.customer.Customer;
 
-import java.sql.SQLException;
 import java.util.List;
 
 /**
@@ -73,6 +72,7 @@ public interface CustomerService {
      *
      * @param customerID The ID of the customer to de-/reactivate.
      * @throws CustomerNotFoundException if the customer does not exist.
+     * @throws IllegalArgumentException if the productID is less than or equal to zero
      */
     void deactivateCustomer(int customerID) throws CustomerNotFoundException; //setActive(false)
     void reactivateCustomer(int customerID) throws CustomerNotFoundException; //setActive(true)

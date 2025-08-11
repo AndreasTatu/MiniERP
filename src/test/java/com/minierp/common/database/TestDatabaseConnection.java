@@ -56,6 +56,7 @@ public class TestDatabaseConnection {
                     description VARCHAR(255),
                     weight DECIMAL(10,2) NOT NULL,
                     price DECIMAL(10,2) NOT NULL,
+                    minStockThreshold INT,
                     active BOOLEAN
                 );
 
@@ -74,7 +75,6 @@ public class TestDatabaseConnection {
                     productID INT,
                     location VARCHAR(50),
                     quantity INT,
-                    minStock INT,
                     maxStock INT,
                     reserved INT,
                     active BOOLEAN,

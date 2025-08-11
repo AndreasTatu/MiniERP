@@ -13,6 +13,12 @@ import java.util.List;
 
 public class OrderDAOImpl implements OrderDAO {
 
+    private final Connection connection;
+
+    public OrderDAOImpl(Connection connection) {
+        this.connection = connection;
+    }
+
     //CRUD-Methods
 
     //create
@@ -26,17 +32,17 @@ public class OrderDAOImpl implements OrderDAO {
         final String insertOrderItemSQL = "INSERT INTO orderItems (orderID, productID, quantity, unitPrice) VALUES (?, ?, ?, ?)";
 
         // Open a connection to the database
-        try(Connection conn = DatabaseConnection.getConnection()) {
+        try {
 
             // Turn off auto-commit so we can manage transactions manually
             // This allows us to commit everything at once, or roll back in case of an error
-            conn.setAutoCommit(false);
+            connection.setAutoCommit(false);
 
             // Create two PreparedStatements:
             // - one to insert the order
             // - one to insert each orderItem
-            try(PreparedStatement insertOrderStmt = conn.prepareStatement(insertOrderSQL, Statement.RETURN_GENERATED_KEYS);
-                PreparedStatement insertOrderItemStmt = conn.prepareStatement(insertOrderItemSQL)) {
+            try(PreparedStatement insertOrderStmt = connection.prepareStatement(insertOrderSQL, Statement.RETURN_GENERATED_KEYS);
+                PreparedStatement insertOrderItemStmt = connection.prepareStatement(insertOrderItemSQL)) {
 
                 // Set values for the order INSERT statement
                 insertOrderStmt.setInt(1, order.getCustomerID());
@@ -49,14 +55,14 @@ public class OrderDAOImpl implements OrderDAO {
                 // Execute the INSERT and check if it actually inserted a row
                 int affectedRowsOrders = insertOrderStmt.executeUpdate();
                 if(affectedRowsOrders == 0){
-                    conn.rollback(); // Undo everything if nothing was inserted
+                    connection.rollback(); // Undo everything if nothing was inserted
                     throw new SQLException("Creating order failed: no rows affected.");
                 }
 
                 // Get the auto-generated orderID from the database
                 try(ResultSet generatedKeys = insertOrderStmt.getGeneratedKeys()){
                     if(!generatedKeys.next()){
-                        conn.rollback(); // undo everything if no orderID was generated
+                        connection.rollback(); // undo everything if no orderID was generated
                         throw new SQLException("Creating order failed: no orderID obtained.");
                     }
 
@@ -82,12 +88,12 @@ public class OrderDAOImpl implements OrderDAO {
                 }
             }
 
-            conn.commit(); // commiting the DB transaction
+            connection.commit(); // commiting the DB transaction
         } catch (SQLException ex) {
-            conn.rollback(); // undo all in case of error
+            connection.rollback(); // undo all in case of error
             throw ex;
         } finally {
-            conn.setAutoCommit(true); // reactivating
+            connection.setAutoCommit(true); // reactivating
         }
     }
 }
@@ -105,17 +111,20 @@ public class OrderDAOImpl implements OrderDAO {
                         // Execute insert for this item and check if it actually inserted a row
                         int affectedRowsOrderItems = insertOrderItemStmt.executeUpdate();
                         if(affectedRowsOrderItems == 0){
-                            conn.rollback(); // If even one item fails, undo everything
+                            connection.rollback(); // If even one item fails, undo everything
                             throw new SQLException("Updating orderItems failed: no rows affected.");
                         }
                     }
                 }
                 // If we get here, everything was successful: commit the transaction
-                conn.commit();
+                connection.commit();
 
                 // Turn auto-commit back on (optional but good practice)
-                conn.setAutoCommit(true);
+                connection.setAutoCommit(true);
             }
+        }
+        catch (SQLException e) {
+            throw new RuntimeException("Database access failed", e);
         }
     }
 
@@ -143,8 +152,7 @@ public class OrderDAOImpl implements OrderDAO {
 
         final String findSQL = "SELECT * FROM orders WHERE orderID = ?";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             findStmt.setInt(1, orderID);
             try(ResultSet rs = findStmt.executeQuery()){
@@ -163,8 +171,7 @@ public class OrderDAOImpl implements OrderDAO {
         final String findSQL = "SELECT * FROM orders";
         final List<Order> orderList = new ArrayList<>();
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             try(ResultSet rs = findStmt.executeQuery()){
                 while(rs.next()){
@@ -182,8 +189,7 @@ public class OrderDAOImpl implements OrderDAO {
         final String findSQL = "SELECT * FROM orders WHERE orderStatus = ?";
         final List<Order> orderList = new ArrayList<>();
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             findStmt.setString(1, orderStatus.name());
             try(ResultSet rs = findStmt.executeQuery()){
@@ -202,8 +208,7 @@ public class OrderDAOImpl implements OrderDAO {
         final String findSQL = "SELECT * FROM orders WHERE customerID = ?";
         final List<Order> orderList = new ArrayList<>();
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             findStmt.setInt(1, customerID);
             try(ResultSet rs = findStmt.executeQuery()){
@@ -223,8 +228,7 @@ public class OrderDAOImpl implements OrderDAO {
         final String findSQL = "SELECT * FROM orderItems WHERE orderID = ?";
         final List<OrderItem> orderItemList = new ArrayList<>();
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement findStmt = conn.prepareStatement(findSQL)){
+        try(PreparedStatement findStmt = connection.prepareStatement(findSQL)){
 
             findStmt.setInt(1, orderID);
             try(ResultSet rs = findStmt.executeQuery()){
@@ -245,9 +249,8 @@ public class OrderDAOImpl implements OrderDAO {
         final String checkSQL = "SELECT 1 FROM orders WHERE orderID = ?";
         final String updateSQL = "UPDATE orders SET orderStatus = ? WHERE orderID = ? ";
 
-        try(Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
-            PreparedStatement updateStmt = conn.prepareStatement(updateSQL)){
+        try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){
 
             checkStmt.setInt(1, orderID);
             try(ResultSet rs = checkStmt.executeQuery()){
