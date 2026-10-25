@@ -30,6 +30,9 @@ public class ProductServiceImpl implements ProductService {
             throw new IllegalArgumentException("Name, Price, Weight must not be empty or null.");
         }
 
+        validateNumbers(product);
+        product.setName(name);
+
         try{
             productDAO.createProduct(product);}
 
@@ -100,6 +103,9 @@ public class ProductServiceImpl implements ProductService {
             throw new IllegalArgumentException("Name, Price, Weight must not be empty or null.");
         }
 
+        validateNumbers(product);
+        product.setName(name);
+
         //DAO checks if the updated name collides with other product
 
         try{
@@ -110,6 +116,12 @@ public class ProductServiceImpl implements ProductService {
 
     }
 
+
+    private void validateNumbers(Product product) {
+        if (product.getPrice().signum() < 0 || product.getWeight().signum() < 0 || product.getMinStockThreshold() < 0) {
+            throw new IllegalArgumentException("Preis, Gewicht und Mindestbestand dürfen nicht negativ sein.");
+        }
+    }
 
     //(soft-)delete
     public void deactivateProduct(int productID) throws ProductNotFoundException{

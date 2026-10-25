@@ -1,63 +1,171 @@
-import React, { useEffect, useState } from 'react';
-import { Activity, ArrowDownLeft, ArrowUpRight, Bell, Boxes, ChevronDown, CircleHelp, Command, LayoutDashboard, Package, Search, Settings2, ShoppingCart, Users, Warehouse } from 'lucide-react';
-import { checkApi, getDashboardCounts, type ApiStatus } from './api';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { ArrowRight, Check, CircleHelp, Command, Database, LayoutDashboard, LoaderCircle, Package, Pencil, Plus, RefreshCw, Search, Users, X } from 'lucide-react';
+import { ApiError, getCollection, saveCustomer, saveProduct, type ApiStatus, type Customer, type Product, type Resource } from './api';
 
-const nav = [
-  { label: 'Übersicht', icon: LayoutDashboard, active: true },
-  { label: 'Aufträge', icon: ShoppingCart },
-  { label: 'Kunden', icon: Users },
-  { label: 'Produkte', icon: Package },
-  { label: 'Lagerbestand', icon: Warehouse },
+type Page = 'overview' | Resource;
+type RecordItem = Customer | Product;
+const navigation = [
+  { page: 'overview' as const, label: 'Übersicht', icon: LayoutDashboard },
+  { page: 'customers' as const, label: 'Kunden', icon: Users },
+  { page: 'products' as const, label: 'Produkte', icon: Package },
 ];
+const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
-function App() {
-  const [apiStatus, setApiStatus] = useState<ApiStatus>('checking');
-  const [counts, setCounts] = useState<{ customers: number; products: number } | null>(null);
-  const [dataError, setDataError] = useState(false);
-  useEffect(() => {
-    let active = true;
-    checkApi().then(status => {
-      if (!active) return;
-      setApiStatus(status);
-      if (status === 'online') getDashboardCounts()
-        .then(data => { if (active) setCounts(data); })
-        .catch(() => { if (active) setDataError(true); });
-    });
-    return () => { active = false; };
+export default function App() {
+  const [page, setPage] = useState<Page>('overview');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [status, setStatus] = useState<ApiStatus>('checking');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const refresh = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setError('');
+    try {
+      const [nextCustomers, nextProducts] = await Promise.all([
+        getCollection<Customer>('customers', signal), getCollection<Product>('products', signal),
+      ]);
+      if (signal?.aborted) return;
+      setCustomers(nextCustomers);
+      setProducts(nextProducts);
+      setStatus('online');
+    } catch (failure) {
+      if (signal?.aborted) return;
+      setStatus(failure instanceof ApiError && failure.status > 0 ? 'online' : 'offline');
+      setError(failure instanceof Error ? failure.message : 'Die Daten konnten nicht geladen werden.');
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    void refresh(controller.signal);
+    return () => controller.abort();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = window.setTimeout(() => setNotice(''), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
+  function saved(item: RecordItem) {
+    if ('customerID' in item) setCustomers(current => [item, ...current.filter(c => c.customerID !== item.customerID)]);
+    else setProducts(current => [item, ...current.filter(p => p.productID !== item.productID)]);
+    setStatus('online');
+    setNotice('Änderungen gespeichert.');
+  }
+
+  const label = navigation.find(item => item.page === page)!.label;
   return <div className="shell">
     <aside className="sidebar">
-      <div className="brand"><div className="brand-mark"><Command size={19}/></div><span>mini<span className="brand-light">ERP</span></span><span className="version">BETA</span></div>
-      <div className="workspace"><div className="workspace-avatar">N</div><div className="workspace-copy"><b>Nordlicht Handel</b><small>Unternehmen</small></div><ChevronDown size={15}/></div>
+      <div className="brand"><div className="brand-mark"><Command size={20}/></div>mini<span>ERP</span><small>BETA</small></div>
+      <div className="workspace"><div className="workspace-avatar">M</div><div><b>Mein Unternehmen</b><small>Lokaler Arbeitsplatz</small></div></div>
       <div className="nav-caption">ARBEITSBEREICH</div>
-      <nav>{nav.map(({label, icon: Icon, active}) => <a className={`nav-item ${active ? 'active' : ''}`} href="#" key={label}><Icon size={17}/><span>{label}</span>{label === 'Aufträge' && <em>8</em>}</a>)}</nav>
-      <div className="sidebar-bottom"><a className="nav-item" href="#"><Settings2 size={17}/><span>Einstellungen</span></a><a className="nav-item" href="#"><CircleHelp size={17}/><span>Hilfe & Support</span></a><div className="user-card"><div className="user-avatar">AM</div><div className="workspace-copy"><b>Alex Meyer</b><small>Administrator</small></div><ChevronDown size={15}/></div></div>
+      <nav aria-label="Hauptnavigation">{navigation.map(({ page: next, label: title, icon: Icon }) =>
+        <button key={next} className={`nav-item ${page === next ? 'active' : ''}`} onClick={() => setPage(next)} aria-current={page === next ? 'page' : undefined}>
+          <Icon size={18}/><span>{title}</span>
+        </button>)}</nav>
+      <div className="sidebar-bottom"><Database size={17}/><div><b>Deine Daten bleiben lokal</b><small>MiniERP · SQLite</small></div></div>
     </aside>
     <main className="main">
-      <header className="topbar"><div className="crumb">Arbeitsbereich <span>/</span> <b>Übersicht</b></div><div className="top-actions"><div className="search"><Search size={15}/><span>Suchen…</span><kbd>⌘ K</kbd></div><button className="icon-button" aria-label="Benachrichtigungen"><Bell size={17}/><i/></button><div className={`connection ${apiStatus}`}><span/>{apiStatus === 'online' ? 'Backend verbunden' : apiStatus === 'checking' ? 'Verbinde…' : 'Backend nicht erreichbar'}</div></div></header>
+      <header className="topbar"><div className="crumb">Arbeitsbereich <span>/</span> <b>{label}</b></div><div className="top-actions">
+        <div className={`connection ${status}`}><span/>{status === 'online' ? 'Backend verbunden' : status === 'checking' ? 'Verbinde…' : 'Backend nicht erreichbar'}</div>
+        <button className="secondary-button" onClick={() => void refresh()} disabled={loading}><RefreshCw size={14} className={loading ? 'spin' : ''}/>Aktualisieren</button>
+      </div></header>
       <div className="content">
-        <div className="welcome-row"><div><div className="eyebrow">SONNTAG, 25. OKTOBER 2026</div><h1>Guten Morgen, Alex <span>☀️</span></h1><p>Hier ist die aktuelle Übersicht für dein Unternehmen.</p></div><button className="primary-button"><span>＋</span> Neuer Auftrag</button></div>
-        {dataError && <div className="data-error">Die API ist erreichbar, aber Kunden- und Produktdaten konnten nicht geladen werden.</div>}
-        <section className="metrics">
-          <Metric title="Umsatz (Monat)" value="24.580,00 €" delta="12,8 %" up note="zum Vormonat" icon={ArrowUpRight} color="blue"/>
-          <Metric title="Offene Aufträge" value="18" delta="3 neu" note="seit letzter Woche" icon={ShoppingCart} color="violet"/>
-          <Metric title="Aktive Kunden" value={counts ? String(counts.customers) : apiStatus === 'offline' ? '—' : '…'} delta="Live" note="aus dem Backend" icon={Users} color="green"/>
-          <Metric title="Aktive Produkte" value={counts ? String(counts.products) : apiStatus === 'offline' ? '—' : '…'} delta="Live" note="aus dem Backend" icon={Boxes} color="amber"/>
-        </section>
-        <section className="middle-grid">
-          <div className="panel revenue-panel"><div className="panel-heading"><div><h2>Umsatzentwicklung</h2><p>Demo-Daten · Deine Einnahmen im Zeitverlauf</p></div><button className="select-button">Letzte 7 Tage <ChevronDown size={14}/></button></div><div className="chart-legend"><span className="legend-dot"/> Umsatz <b>8.420 €</b><span className="legend-muted">+ 8,4 % zur Vorwoche</span></div><div className="chart"><div className="y-labels"><span>4.000 €</span><span>3.000 €</span><span>2.000 €</span><span>1.000 €</span><span>0 €</span></div><div className="plot"><div className="gridline g1"/><div className="gridline g2"/><div className="gridline g3"/><div className="gridline g4"/><svg viewBox="0 0 700 205" preserveAspectRatio="none" aria-label="Umsatzdiagramm"><defs><linearGradient id="fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#5b6ee1" stopOpacity=".22"/><stop offset="1" stopColor="#5b6ee1" stopOpacity="0"/></linearGradient></defs><path d="M0 164 C40 150 55 155 90 136 S145 128 180 139 S230 121 270 111 S330 121 360 98 S415 105 450 79 S510 92 540 63 S590 81 620 48 S670 54 700 25 L700 205 L0 205Z" fill="url(#fill)"/><path d="M0 164 C40 150 55 155 90 136 S145 128 180 139 S230 121 270 111 S330 121 360 98 S415 105 450 79 S510 92 540 63 S590 81 620 48 S670 54 700 25" fill="none" stroke="#5b6ee1" strokeWidth="3" vectorEffect="non-scaling-stroke"/></svg><div className="x-labels"><span>Mo, 19.</span><span>Di, 20.</span><span>Mi, 21.</span><span>Do, 22.</span><span>Fr, 23.</span><span>Sa, 24.</span><span>So, 25.</span></div></div></div></div>
-          <div className="panel stock-panel"><div className="panel-heading"><div><h2>Bestand im Blick</h2><p>Demo-Daten · Artikel mit niedrigem Bestand</p></div><button className="text-link">Alle ansehen <span>→</span></button></div><div className="stock-list"><StockRow initials="KB" name="Kaffeebohnen Bio" sku="ART-0042" count="4" tone="red"/><StockRow initials="TM" name="Teemischung Minze" sku="ART-0018" count="8" tone="amber"/><StockRow initials="GL" name="Glasflasche 500ml" sku="ART-0061" count="12" tone="amber"/><StockRow initials="VP" name="Versandpaket S" sku="ART-0026" count="16" tone="green"/></div></div>
-        </section>
-        <section className="panel orders-panel"><div className="panel-heading"><div><h2>Letzte Aufträge</h2><p>Demo-Daten · Die neuesten Bestellungen in deinem Shop</p></div><button className="text-link">Alle Aufträge <span>→</span></button></div><div className="table-wrap"><table><thead><tr><th>AUFTRAG</th><th>KUNDE</th><th>DATUM</th><th>STATUS</th><th className="right">BETRAG</th></tr></thead><tbody><OrderRow id="#AU-2026-084" name="Mara Schneider" initials="MS" date="Heute, 10:42" status="In Bearbeitung" amount="248,50 €"/><OrderRow id="#AU-2026-083" name="Lukas Weber" initials="LW" date="Heute, 09:18" status="Versendet" amount="86,00 €"/><OrderRow id="#AU-2026-082" name="Julia Fischer" initials="JF" date="Gestern, 16:34" status="Abgeschlossen" amount="1.240,00 €"/><OrderRow id="#AU-2026-081" name="Leon Hoffmann" initials="LH" date="Gestern, 14:02" status="In Bearbeitung" amount="172,90 €"/></tbody></table></div></section>
-        <footer><span><Activity size={13}/> Alle Systeme betriebsbereit</span><span>MiniERP · Version 0.1.0</span></footer>
+        {error && <div className="message error" role="alert">{error}<button onClick={() => void refresh()} disabled={loading}>Erneut versuchen</button></div>}
+        {notice && <div className="toast" role="status"><Check size={16}/>{notice}</div>}
+        {page === 'overview' ? <>
+          <div className="welcome-row"><div><div className="eyebrow">{new Intl.DateTimeFormat('de-DE', { dateStyle: 'full', timeZone: 'Europe/Berlin' }).format(new Date())}</div><h1>Alles im Überblick.</h1><p>Deine Stammdaten. Ein Ort für den nächsten Schritt.</p></div><div className="page-symbol"><LayoutDashboard size={25}/></div></div>
+          <section className="metrics" aria-label="Kennzahlen">
+            <Metric title="Aktive Kunden" count={customers.length} loading={loading} unavailable={status !== 'online' && !customers.length} icon="customers"/>
+            <Metric title="Aktive Produkte" count={products.length} loading={loading} unavailable={status !== 'online' && !products.length} icon="products"/>
+          </section>
+          <section className="overview-grid">
+            <OverviewList title="Deine Kunden" description="Kontakte und Kundendaten verwalten" items={customers} loading={loading} onOpen={() => setPage('customers')}/>
+            <OverviewList title="Deine Produkte" description="Artikel, Preise und Mindestbestände pflegen" items={products} loading={loading} onOpen={() => setPage('products')}/>
+          </section>
+          <div className="next-step"><CircleHelp size={20}/><div><b>Ein guter Anfang: deine Stammdaten.</b><p>Lege Kunden und Produkte an. Sie bilden die Grundlage für Aufträge und Lagerverwaltung.</p></div></div>
+        </> : <RecordsPage key={page} kind={page} items={page === 'customers' ? customers : products} loading={loading} onSaved={saved}/>}
+        <footer><span><Database size={13}/> Lokale Datenbank</span><span>MiniERP · 0.1.0</span></footer>
       </div>
     </main>
   </div>;
 }
 
-function Metric({title, value, delta, note, icon: Icon, color, up}: {title:string;value:string;delta:string;note:string;icon:typeof ArrowUpRight;color:string;up?:boolean}) { return <article className="metric"><div className="metric-top"><span>{title}</span><div className={`metric-icon ${color}`}><Icon size={17}/></div></div><div className="metric-value">{value}</div><div className="metric-foot"><span className={up ? 'positive' : 'neutral'}>{up && <ArrowUpRight size={13}/>} {delta}</span><span>{note}</span></div></article>; }
-function StockRow({initials,name,sku,count,tone}:{initials:string;name:string;sku:string;count:string;tone:string}) { return <div className="stock-row"><div className="product-avatar">{initials}</div><div className="stock-name"><b>{name}</b><small>{sku}</small></div><span className={`stock-count ${tone}`}><ArrowDownLeft size={12}/>{count} Stk.</span></div>; }
-function OrderRow({id,name,initials,date,status,amount}:{id:string;name:string;initials:string;date:string;status:string;amount:string}) { const c=status==='Versendet'?'shipped':status==='Abgeschlossen'?'done':'pending'; return <tr><td className="order-id">{id}</td><td><div className="customer-cell"><span className="customer-avatar">{initials}</span>{name}</div></td><td className="muted-cell">{date}</td><td><span className={`status ${c}`}><i/>{status}</span></td><td className="right amount">{amount}</td></tr>; }
+function Metric({ title, count, loading, unavailable, icon }: { title: string; count: number; loading: boolean; unavailable: boolean; icon: Resource }) {
+  const Icon = icon === 'customers' ? Users : Package;
+  return <article className="metric"><div className="metric-top"><span>{title}</span><div className={`metric-icon ${icon}`}><Icon size={19}/></div></div><div className="metric-value">{loading ? '…' : unavailable ? '—' : count}</div><div className="metric-foot">Aktuelle Datensätze aus dem Backend</div></article>;
+}
 
-export default App;
+function OverviewList({ title, description, items, loading, onOpen }: { title: string; description: string; items: RecordItem[]; loading: boolean; onOpen: () => void }) {
+  return <section className="panel"><div className="panel-heading"><div><h2>{title}</h2><p>{description}</p></div><button className="text-link" onClick={onOpen}>Öffnen <ArrowRight size={15}/></button></div>
+    {loading ? <div className="empty compact"><LoaderCircle className="spin" size={22}/>Daten werden geladen…</div> : !items.length ? <div className="empty compact">Noch keine Einträge.<button className="text-link" onClick={onOpen}>Ersten Eintrag anlegen <ArrowRight size={14}/></button></div> : <div className="overview-list">{items.slice(0, 5).map(item => <button className="overview-row" onClick={onOpen} key={'customerID' in item ? item.customerID : item.productID}><span className="record-avatar">{item.name.slice(0, 2).toUpperCase()}</span><span><b>{item.name}</b><small>{'email' in item ? item.email : euro.format(Number(item.price))}</small></span><ArrowRight size={14}/></button>)}</div>}
+  </section>;
+}
+
+function RecordsPage({ kind, items, loading, onSaved }: { kind: Resource; items: RecordItem[]; loading: boolean; onSaved: (item: RecordItem) => void }) {
+  const [query, setQuery] = useState('');
+  const [editing, setEditing] = useState<RecordItem | null | undefined>(undefined);
+  const customer = kind === 'customers';
+  const title = customer ? 'Kunden' : 'Produkte';
+  const singular = customer ? 'Kunde' : 'Produkt';
+  const filtered = items.filter(item => `${item.name} ${'email' in item ? item.email : item.description ?? ''}`.toLocaleLowerCase('de').includes(query.toLocaleLowerCase('de')));
+  return <>
+    <div className="welcome-row"><div><div className="eyebrow">STAMMDATEN</div><h1>{title}</h1><p>{customer ? 'Alle Kontakte und Kundendaten an einem Ort.' : 'Dein Sortiment, übersichtlich und aktuell.'}</p></div><button className="primary-button" onClick={() => setEditing(null)}><Plus size={16}/> {customer ? 'Neuer Kunde' : 'Neues Produkt'}</button></div>
+    <section className="panel records-panel"><div className="list-toolbar"><div className="search"><Search size={16}/><input aria-label={`${title} durchsuchen`} placeholder={`${title} durchsuchen…`} value={query} onChange={event => setQuery(event.target.value)}/>{query && <button aria-label="Suche löschen" onClick={() => setQuery('')}><X size={14}/></button>}</div><span>{filtered.length} {filtered.length === 1 ? singular : title}</span></div>
+      {loading ? <div className="empty"><LoaderCircle className="spin" size={24}/>Daten werden geladen…</div> : !filtered.length ? <div className="empty">{customer ? <Users size={28}/> : <Package size={28}/>}<b>{query ? 'Keine passenden Einträge' : `Noch keine ${title} vorhanden`}</b><p>{query ? 'Versuche einen anderen Suchbegriff.' : `Lege jetzt ${customer ? 'deinen ersten Kunden' : 'dein erstes Produkt'} an.`}</p>{!query && <button className="secondary-button" onClick={() => setEditing(null)}><Plus size={15}/>Eintrag anlegen</button>}</div> : <div className="table-wrap"><table><thead><tr><th>{customer ? 'KUNDE' : 'PRODUKT'}</th><th>{customer ? 'E-MAIL' : 'PREIS'}</th><th>{customer ? 'TELEFON' : 'GEWICHT'}</th><th>{customer ? 'ADRESSE' : 'MINDESTBESTAND'}</th><th><span className="sr-only">Aktionen</span></th></tr></thead><tbody>{filtered.map(item => {
+        const id = 'customerID' in item ? item.customerID : item.productID;
+        return <tr key={id}><td><div className="record-name"><span className="record-avatar">{item.name.slice(0, 2).toUpperCase()}</span><div><b>{item.name}</b><small>#{id}</small></div></div></td><td>{'email' in item ? item.email : euro.format(Number(item.price))}</td><td>{'phone' in item ? item.phone : String(item.weight)}</td><td>{'address' in item ? item.address : `${item.minStockThreshold} Stk.`}</td><td className="right"><button className="edit-button" aria-label={`${item.name} bearbeiten`} onClick={() => setEditing(item)}><Pencil size={14}/><span>Bearbeiten</span></button></td></tr>;
+      })}</tbody></table></div>}
+    </section>
+    {editing !== undefined && <RecordEditor kind={kind} record={editing} onClose={() => setEditing(undefined)} onSaved={item => { onSaved(item); setEditing(undefined); }}/ >}
+  </>;
+}
+
+function RecordEditor({ kind, record, onClose, onSaved }: { kind: Resource; record: RecordItem | null; onClose: () => void; onSaved: (item: RecordItem) => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const customer = kind === 'customers';
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [fields, setFields] = useState<Record<string, string>>((): Record<string, string> => {
+    if (customer) {
+      const item = record as Customer | null;
+      return { name: item?.name ?? '', address: item?.address ?? '', email: item?.email ?? '', phone: item?.phone ?? '', birthdate: item?.birthdate ?? '' };
+    }
+    const item = record as Product | null;
+    return { name: item?.name ?? '', description: item?.description ?? '', price: String(item?.price ?? ''), weight: String(item?.weight ?? ''), minStockThreshold: String(item?.minStockThreshold ?? 0) };
+  });
+  useEffect(() => { dialog.current?.showModal(); }, []);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      let saved: RecordItem;
+      if (customer) saved = await saveCustomer({ name: fields.name, address: fields.address, email: fields.email, phone: fields.phone, birthdate: fields.birthdate || null }, record && 'customerID' in record ? record.customerID : undefined);
+      else saved = await saveProduct({ name: fields.name, description: fields.description || null, price: fields.price, weight: fields.weight, minStockThreshold: Number(fields.minStockThreshold) }, record && 'productID' in record ? record.productID : undefined);
+      onSaved(saved);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Speichern fehlgeschlagen.');
+      setBusy(false);
+    }
+  }
+
+  function field(name: string, label: string, type = 'text', required = true, step?: string) {
+    return <label className="form-field" htmlFor={`field-${name}`} key={name}><span>{label}{!required && <small>optional</small>}</span><input id={`field-${name}`} name={name} type={type} required={required} step={step} min={type === 'number' ? '0' : undefined} value={fields[name]} onChange={event => setFields(current => ({ ...current, [name]: event.target.value }))} disabled={busy}/></label>;
+  }
+  return <dialog ref={dialog} className="editor" aria-labelledby="editor-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
+    <form onSubmit={event => void submit(event)}><div className="editor-heading"><div><div className="eyebrow">{record ? 'STAMMDATEN BEARBEITEN' : 'STAMMDATEN ANLEGEN'}</div><h2 id="editor-title">{customer ? record ? 'Kunde bearbeiten' : 'Neuer Kunde' : record ? 'Produkt bearbeiten' : 'Neues Produkt'}</h2></div><button type="button" className="icon-button" aria-label="Schließen" disabled={busy} onClick={onClose}><X size={20}/></button></div>
+      <div className="editor-fields">{field('name', 'Name')}{customer ? <>{field('email', 'E-Mail', 'email')}{field('phone', 'Telefon', 'tel')}{field('address', 'Adresse')}{field('birthdate', 'Geburtsdatum', 'date', false)}</> : <>{field('description', 'Beschreibung', 'text', false)}<div className="field-pair">{field('price', 'Preis (€)', 'number', true, '0.01')}{field('weight', 'Gewicht', 'number', true, 'any')}</div>{field('minStockThreshold', 'Mindestbestand (Stück)', 'number', true, '1')}</>}</div>
+      {error && <div className="message error" role="alert">{error}</div>}
+      <div className="editor-footer"><button type="button" className="secondary-button" disabled={busy} onClick={onClose}>Abbrechen</button><button type="submit" className="primary-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={15}/> : <Check size={15}/>} {busy ? 'Wird gespeichert…' : 'Speichern'}</button></div>
+    </form>
+  </dialog>;
+}

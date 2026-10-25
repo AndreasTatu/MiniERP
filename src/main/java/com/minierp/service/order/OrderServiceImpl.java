@@ -4,8 +4,10 @@ import com.minierp.dao.order.OrderDAO;
 import com.minierp.dao.product.ProductDAO;
 import com.minierp.model.order.Order;
 import com.minierp.model.order.OrderItem;
+import com.minierp.model.order.OrderStatus;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -30,6 +32,15 @@ public class OrderServiceImpl implements OrderService {
 
         if (order.getCustomerID() <= 0)
             throw new IllegalArgumentException("customerID must be positive.");
+
+        if (order.getOrderDateTime() == null)
+            throw new IllegalArgumentException("Order date must not be null.");
+        if (order.getOrderStatus() != OrderStatus.PENDING)
+            throw new IllegalArgumentException("New orders must have PENDING status.");
+        BigDecimal discount = order.getDiscount() == null ? BigDecimal.ZERO : order.getDiscount();
+        BigDecimal tax = order.getTax() == null ? BigDecimal.ZERO : order.getTax();
+        if (discount.signum() < 0 || discount.compareTo(BigDecimal.ONE) > 0 || tax.signum() < 0)
+            throw new IllegalArgumentException("Discount must be between 0 and 1; tax must not be negative.");
 
         // Validate and compute subtotal from orderItems (cheap checks first, DB checks later)
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -70,8 +81,67 @@ public class OrderServiceImpl implements OrderService {
 
         }
 
-
-
+        // Rates are fractions: 0.10 = 10% discount, 0.19 = 19% tax.
+        // Round only the final amount, after discount and tax have both been applied.
+        order.setDiscount(discount);
+        order.setTax(tax);
+        order.setTotalPrice(subtotal.multiply(BigDecimal.ONE.subtract(discount))
+                .multiply(BigDecimal.ONE.add(tax)).setScale(2, RoundingMode.HALF_UP));
+        database(() -> { orderDAO.createOrder(order, orderItems); return null; });
+    }
+    @Override
+    public Order findOrderByID(int orderID) {
+        requirePositiveID(orderID);
+        return database(() -> orderDAO.findOrderByID(orderID));
     }
 
+    @Override
+    public List<Order> findAllOrders() {
+        return database(orderDAO::findAllOrders);
+    }
+
+    @Override
+    public List<Order> findAllOrdersByStatus(OrderStatus status) {
+        if (status == null) throw new IllegalArgumentException("Order status must not be null.");
+        return database(() -> orderDAO.findAllOrdersByStatus(status));
+    }
+
+    @Override
+    public List<Order> findAllOrdersByCustomer(int customerID) {
+        requirePositiveID(customerID);
+        return database(() -> orderDAO.findAllOrdersByCustomer(customerID));
+    }
+
+    @Override
+    public List<OrderItem> findAllOrderItemsByOrder(int orderID) {
+        requirePositiveID(orderID);
+        return database(() -> orderDAO.findAllOrderItemsByOrder(orderID));
+    }
+
+    @Override
+    public void updateOrderStatus(int orderID, OrderStatus status) {
+        requirePositiveID(orderID);
+        if (status == null) throw new IllegalArgumentException("Order status must not be null.");
+        OrderStatus current = findOrderByID(orderID).getOrderStatus();
+        boolean allowed = current == status || switch (current) {
+            case PENDING -> status == OrderStatus.CONFIRMED || status == OrderStatus.CANCELLED;
+            case CONFIRMED -> status == OrderStatus.SHIPPED || status == OrderStatus.CANCELLED;
+            case SHIPPED -> status == OrderStatus.DELIVERED;
+            case DELIVERED, CANCELLED -> false;
+        };
+        if (!allowed) throw new IllegalArgumentException("Invalid order status transition.");
+        database(() -> { orderDAO.updateOrderStatus(orderID, status); return null; });
+    }
+
+    private void requirePositiveID(int id) {
+        if (id <= 0) throw new IllegalArgumentException("ID must be positive.");
+    }
+
+    private <T> T database(DatabaseCall<T> call) {
+        try { return call.run(); }
+        catch (SQLException exception) { throw new RuntimeException("Database access error", exception); }
+    }
+
+    @FunctionalInterface
+    private interface DatabaseCall<T> { T run() throws SQLException; }
 }

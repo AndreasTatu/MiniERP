@@ -16,7 +16,7 @@ public final class SchemaInitializer {
                         customerID INTEGER PRIMARY KEY AUTOINCREMENT,
                         name TEXT NOT NULL,
                         address TEXT,
-                        birthdate TEXT,
+                        birthdate DATE,
                         email TEXT NOT NULL UNIQUE,
                         phone TEXT,
                         active INTEGER NOT NULL DEFAULT 1
@@ -37,7 +37,7 @@ public final class SchemaInitializer {
                     CREATE TABLE IF NOT EXISTS orders (
                         orderID INTEGER PRIMARY KEY AUTOINCREMENT,
                         customerID INTEGER NOT NULL,
-                        orderDateTime TEXT NOT NULL,
+                        orderDateTime DATETIME NOT NULL,
                         discount NUMERIC DEFAULT 0,
                         tax NUMERIC DEFAULT 0,
                         totalPrice NUMERIC NOT NULL,

@@ -1,0 +1,3 @@
+storeDir: ../.tools/pnpm-store
+allowBuilds:
+  esbuild: true

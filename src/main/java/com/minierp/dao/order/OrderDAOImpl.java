@@ -23,112 +23,45 @@ public class OrderDAOImpl implements OrderDAO {
     //create
     @Override
     public void createOrder(Order order, List<OrderItem> orderItems) throws SQLException {
-
-        // Define SQL for inserting a new order
-        final String insertOrderSQL = "INSERT INTO orders (customerID, orderDateTime, discount, tax, totalPrice, orderStatus) VALUES(?, ?, ?, ?, ?, ?)";
-
-        // Define SQL for inserting order items that belong to the order
-        final String insertOrderItemSQL = "INSERT INTO orderItems (orderID, productID, quantity, unitPrice) VALUES (?, ?, ?, ?)";
-
-        // Open a connection to the database
-        try {
-
-            // Turn off auto-commit so we can manage transactions manually
-            // This allows us to commit everything at once, or roll back in case of an error
-            connection.setAutoCommit(false);
-
-            // Create two PreparedStatements:
-            // - one to insert the order
-            // - one to insert each orderItem
-            try(PreparedStatement insertOrderStmt = connection.prepareStatement(insertOrderSQL, Statement.RETURN_GENERATED_KEYS);
-                PreparedStatement insertOrderItemStmt = connection.prepareStatement(insertOrderItemSQL)) {
-
-                // Set values for the order INSERT statement
-                insertOrderStmt.setInt(1, order.getCustomerID());
-                insertOrderStmt.setTimestamp(2, Timestamp.valueOf(order.getOrderDateTime()));
-                insertOrderStmt.setBigDecimal(3, order.getDiscount());
-                insertOrderStmt.setBigDecimal(4, order.getTax());
-                insertOrderStmt.setBigDecimal(5, order.getTotalPrice());
-                insertOrderStmt.setString(6, order.getOrderStatus().name());
-
-                // Execute the INSERT and check if it actually inserted a row
-                int affectedRowsOrders = insertOrderStmt.executeUpdate();
-                if(affectedRowsOrders == 0){
-                    connection.rollback(); // Undo everything if nothing was inserted
-                    throw new SQLException("Creating order failed: no rows affected.");
-                }
-
-                // Get the auto-generated orderID from the database
-                try(ResultSet generatedKeys = insertOrderStmt.getGeneratedKeys()){
-                    if(!generatedKeys.next()){
-                        connection.rollback(); // undo everything if no orderID was generated
-                        throw new SQLException("Creating order failed: no orderID obtained.");
-                    }
-
-                    // Extract the generated orderID (PK)
-                    int orderID = generatedKeys.getInt(1);
-
-/*********************************************************************
-//version with .addBatch()-->.executeBatch()-->performance improvement because everything gets handed to the DB at once
-
-                    // inserting all orderItems from the provided list
-                for (OrderItem item : orderItems) {
-                    itemStmt.setInt(1, orderID);
-                    itemStmt.setInt(2, item.getProductID());
-                    itemStmt.setInt(3, item.getQuantity());
-                    itemStmt.setBigDecimal(4, item.getUnitPrice());
-                    itemStmt.addBatch();
-                }
-
-                int[] itemResults = itemStmt.executeBatch();
-                if (itemResults.length != orderItems.size()) {
-                    conn.rollback();
-                    throw new SQLException("Inserting order items failed, not all items were inserted.");
-                }
+        String orderSql = "INSERT INTO orders (customerID, orderDateTime, discount, tax, totalPrice, orderStatus) VALUES (?, ?, ?, ?, ?, ?)";
+        String itemSql = "INSERT INTO orderItems (orderID, productID, quantity, unitPrice) VALUES (?, ?, ?, ?)";
+        boolean ownsTransaction = connection.getAutoCommit();
+        Savepoint savepoint = null;
+        if (ownsTransaction) connection.setAutoCommit(false);
+        else savepoint = connection.setSavepoint();
+        try (PreparedStatement orderStatement = connection.prepareStatement(orderSql, Statement.RETURN_GENERATED_KEYS);
+             PreparedStatement itemStatement = connection.prepareStatement(itemSql)) {
+            orderStatement.setInt(1, order.getCustomerID());
+            orderStatement.setTimestamp(2, Timestamp.valueOf(order.getOrderDateTime()));
+            orderStatement.setBigDecimal(3, order.getDiscount());
+            orderStatement.setBigDecimal(4, order.getTax());
+            orderStatement.setBigDecimal(5, order.getTotalPrice());
+            orderStatement.setString(6, order.getOrderStatus().name());
+            if (orderStatement.executeUpdate() != 1) throw new SQLException("Order was not inserted.");
+            int orderID;
+            try (ResultSet keys = orderStatement.getGeneratedKeys()) {
+                if (!keys.next()) throw new SQLException("No generated order ID returned.");
+                orderID = keys.getInt(1);
             }
-
-            connection.commit(); // commiting the DB transaction
-        } catch (SQLException ex) {
-            connection.rollback(); // undo all in case of error
-            throw ex;
+            for (OrderItem item : orderItems) {
+                itemStatement.setInt(1, orderID);
+                itemStatement.setInt(2, item.getProductID());
+                itemStatement.setInt(3, item.getQuantity());
+                itemStatement.setBigDecimal(4, item.getUnitPrice());
+                if (itemStatement.executeUpdate() != 1) throw new SQLException("Order item was not inserted.");
+            }
+            if (ownsTransaction) connection.commit();
+            else connection.releaseSavepoint(savepoint);
+        } catch (SQLException | RuntimeException exception) {
+            try {
+                if (ownsTransaction) connection.rollback();
+                else connection.rollback(savepoint);
+            } catch (SQLException rollbackFailure) { exception.addSuppressed(rollbackFailure); }
+            throw exception;
         } finally {
-            connection.setAutoCommit(true); // reactivating
+            if (ownsTransaction) connection.setAutoCommit(true);
         }
     }
-}
-**********************************************************************/
-
-
-                    // For-each item in the order (List<OrderItem> orderItems)
-                    for(OrderItem item : orderItems) {
-                        // Set the values for this item in the orderItems table
-                        insertOrderItemStmt.setInt(1, orderID); // Link to the created order
-                        insertOrderItemStmt.setInt(2, item.getProductID());
-                        insertOrderItemStmt.setInt(3, item.getQuantity());
-                        insertOrderItemStmt.setBigDecimal(4, item.getUnitPrice());
-
-                        // Execute insert for this item and check if it actually inserted a row
-                        int affectedRowsOrderItems = insertOrderItemStmt.executeUpdate();
-                        if(affectedRowsOrderItems == 0){
-                            connection.rollback(); // If even one item fails, undo everything
-                            throw new SQLException("Updating orderItems failed: no rows affected.");
-                        }
-                    }
-                }
-                // If we get here, everything was successful: commit the transaction
-                connection.commit();
-
-                // Turn auto-commit back on (optional but good practice)
-                connection.setAutoCommit(true);
-            }
-        }
-        catch (SQLException e) {
-            throw new RuntimeException("Database access failed", e);
-        }
-    }
-
-
-
     //read
 
     private final Order mapResultSetToOrder(ResultSet rs) throws SQLException{

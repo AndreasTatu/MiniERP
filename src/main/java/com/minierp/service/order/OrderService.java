@@ -26,7 +26,8 @@ public interface OrderService {
      * Creates a new order along with its associated order items.
      * Performs:
      *      Validation of order data (e.g., customer ID, non-empty order items, positive quantities/prices)
-     *      Calculation of total price if not provided
+     *      Calculation of total price from items, fractional discount and fractional tax.
+     *      total = subtotal * (1 - discount) * (1 + tax), rounded to two decimal places.
      *
      * @param order      the order to be created
      * @param orderItems the list of order items belonging to the order

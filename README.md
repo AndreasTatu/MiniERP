@@ -1,30 +1,80 @@
 # MiniERP
 
-MiniERP currently contains a Java 17/Maven persistence and business layer and an initial React/Vite frontend. The frontend lives in `frontend/`; the Java sources remain under `src/main/java`.
+Kleines ERP mit Java 17, SQLite und einem React-/TypeScript-Frontend. Das Backend behält seine Model-, DAO- und Service-Schichten; eine HTTP-Schicht verbindet die Services mit React.
 
-## Current backend
+## Lokal starten
 
-- SQLite JDBC persistence with DAO implementations for customers, products, stock and orders.
-- Service interfaces and implementations for those areas. Customer/product/stock CRUD and order reads/status updates are represented in the existing layers.
-- There is no Spring runtime. The API uses the JDK HTTP server. `OrderServiceImpl.createOrder` currently validates input but does not complete total calculation or call persistence.
-- On startup, `SchemaInitializer` creates any missing SQLite tables. The default database URL is `jdbc:sqlite:miniERP.db`; override it with `MINIERP_DB_URL`.
-- The API listens on port 8080 (override with `MINIERP_PORT`) and currently provides `GET /api/health`, `GET /api/customers`, and `GET /api/products`. The customer and product routes return active records as JSON.
+Voraussetzungen: JDK 17 oder neuer, Maven, Node.js 22 und pnpm 11.25.0. Alternativ kann das Backend in IntelliJ über `com.minierp.api.ApiServer` gestartet werden.
 
-## Frontend
+Backend im Projektverzeichnis:
+
+```sh
+mvn compile exec:java
+```
+
+Frontend in einem zweiten Terminal:
 
 ```sh
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
-The dashboard reads active customer and product counts from the API. Revenue, stock and order widgets remain marked sample data. To point it elsewhere, copy `.env.example` to `.env.local` and set `VITE_API_BASE_URL`.
+Die Oberfläche läuft standardmäßig auf `http://localhost:5173`, die API auf `http://127.0.0.1:8080/api`. Für eine andere API-Adresse `frontend/.env.example` nach `frontend/.env.local` kopieren und `VITE_API_BASE_URL` anpassen. Die Vite-Konsole zeigt den tatsächlich verwendeten Frontend-Port an.
 
-Run the Java API from the IDE by starting `com.minierp.api.ApiServer`. The API requires Java 17 or newer.
+Falls das vorhandene Windows-JDK `Unable to establish loopback connection` mit `Invalid argument: connect` meldet, kann ein verkürzter Temp-Pfad mit `~1` die Ursache sein. Für den betroffenen Terminal-Prozess vor dem Start oder Testlauf einen vollständigen Temp-Pfad setzen:
 
-## Suggested next steps
+```powershell
+New-Item -ItemType Directory -Force .tools/tmp | Out-Null
+$env:TEMP = (Resolve-Path .tools/tmp).Path
+$env:TMP = $env:TEMP
+```
 
-1. Add a schema/migration initializer and move the SQLite URL out of `DatabaseConnection` into configuration.
-2. Finish and verify the order creation workflow.
-3. Add JSON request/response DTOs and API routes for products, customers, stock and orders, with consistent validation and error responses.
-4. Replace the dashboard sample content with API-backed summaries, then add list/detail/create/edit flows per module.
+## Konfiguration und Daten
+
+| Variable | Standard | Bedeutung |
+| --- | --- | --- |
+| `MINIERP_PORT` | `8080` | API-Port auf dem lokalen Rechner |
+| `MINIERP_DB_URL` | `jdbc:sqlite:miniERP.db` | JDBC-Verbindungsadresse |
+| `VITE_API_BASE_URL` | `http://127.0.0.1:8080/api` | API-Adresse für React |
+
+`SchemaInitializer` legt fehlende Tabellen beim Start an. Er ersetzt keine bestehenden Tabellen und ist noch kein versioniertes Migrationssystem. Die API bearbeitet Anfragen nacheinander, weil die bestehenden DAOs eine JDBC-Verbindung teilen. Sie ist für lokale Entwicklung konfiguriert; Anmeldung und Mehrbenutzerbetrieb sind noch nicht implementiert.
+
+Lokale Datenbanken, Zugangsdaten in `*.local`, Abhängigkeiten und Build-Ausgaben werden nicht versioniert. Die API erzeugt keine Beispieldaten.
+
+## Nutzbare Funktionen
+
+- Übersicht mit echten Kunden- und Produktzahlen.
+- Kunden und Produkte durchsuchen, anlegen und bearbeiten; Formulare zeigen Fehler der API an.
+- Laden, leere Listen, Verbindungsfehler und erfolgreiche Speicherungen sind in der Oberfläche abgebildet.
+- Die Auftragserstellung im Service berechnet `Positionssumme × (1 − Rabatt) × (1 + Steuer)`. Rabatt und Steuer sind Anteile (`0.10` = 10 %, `0.19` = 19 %); der Gesamtbetrag wird abschließend kaufmännisch auf zwei Nachkommastellen gerundet. Auftrag und Positionen werden gemeinsam gespeichert oder zurückgerollt.
+
+## HTTP-API
+
+Antworten sind JSON. Kunden- und Produktlisten enthalten aktive Datensätze. Neue Datensätze erhalten serverseitig ihre ID und den Status aktiv.
+
+| Methode | Pfad | Funktion |
+| --- | --- | --- |
+| GET | `/api/health` | Erreichbarkeit |
+| GET / POST | `/api/customers` | Kunden auflisten / anlegen |
+| GET / PUT | `/api/customers/{id}` | Kunden lesen / bearbeiten |
+| GET / POST | `/api/products` | Produkte auflisten / anlegen |
+| GET / PUT | `/api/products/{id}` | Produkte lesen / bearbeiten |
+
+POST und PUT erwarten `Content-Type: application/json`. Kundenfelder: `name`, `address`, `birthdate` (ISO-Datum oder null), `email`, `phone`. Produktfelder: `name`, `description` (optional), `weight`, `price`, `minStockThreshold`. Dezimalwerte können als JSON-Zahl oder Dezimalstring übertragen werden. IDs und Aktivstatus sind keine schreibbaren Formularfelder.
+
+Fehlerformat: `{ "error": "Beschreibung" }`. Statuscodes: 400 ungültige Eingabe, 404 unbekannter Datensatz/Endpunkt, 409 Duplikat, 405 unzulässige Methode, 413 zu große Anfrage, 415 falscher Inhaltstyp, 500 interner Fehler. POST liefert 201 und den gespeicherten Datensatz mit `Location`-Header.
+
+## Qualität und Versionskontrolle
+
+```sh
+mvn test
+cd frontend
+pnpm run build
+```
+
+Die Integrationstests verwenden eigene Datenbanken im Arbeitsspeicher. Sie prüfen unter anderem HTTP-CRUD, Duplikate, Geburtsdaten, Produktvalidierung, Rabatt-/Steuerberechnung und Transaktions-Rollback. GitHub Actions führt Java-Tests und Frontend-Build bei Pushes und Pull Requests aus.
+
+Repository: https://github.com/AndreasTatu/MiniERP. Aktueller Entwicklungsbranch: `codex/erp-frontend-api`; der lokale Git-Remote heißt `AndreasTatu`.
+
+Als nächste Ausbauschritte stehen die Auftragsoberfläche, die Lageroberfläche, Archivierung/Reaktivierung und versionierte Datenbankmigrationen an.
