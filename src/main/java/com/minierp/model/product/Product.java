@@ -8,7 +8,7 @@ public class Product {
     private int productID;
     private String name;
     private String description; //nullable
-    private BigDecimal weight;
+    private BigDecimal weight; // grams
     private BigDecimal price;
     private int minStockThreshold;
     private boolean active = true;

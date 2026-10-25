@@ -18,6 +18,17 @@ export type ProductInput = {
 };
 export type Product = ProductInput & { productID: number; active: boolean };
 export type Resource = 'customers' | 'products';
+export type Collection = Resource | 'orders' | 'stocks';
+export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+export type Order = {
+  orderID: number; customerID: number; orderDateTime: string;
+  discount: string | number; tax: string | number; totalPrice: string | number; orderStatus: OrderStatus;
+};
+export type OrderItem = { orderItemID: number; orderID: number; productID: number; quantity: number; unitPrice: string | number };
+export type OrderDetail = { order: Order; items: OrderItem[] };
+export type OrderInput = { customerID: number; discount: string; tax: string; items: { productID: number; quantity: number }[] };
+export type StockInput = { productID: number; location: string; quantity: number; maxStock: number; reserved: number };
+export type Stock = StockInput & { stockID: number; active: boolean };
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -40,8 +51,24 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
-export function getCollection<T>(resource: Resource, signal?: AbortSignal): Promise<T[]> {
+export function getCollection<T>(resource: Collection, signal?: AbortSignal): Promise<T[]> {
   return request<T[]>(resource, { signal });
+}
+
+export function getOrder(id: number, signal?: AbortSignal): Promise<OrderDetail> {
+  return request<OrderDetail>(`orders/${id}`, { signal });
+}
+
+export function createOrder(data: OrderInput): Promise<OrderDetail> {
+  return request<OrderDetail>('orders', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export function updateOrderStatus(id: number, status: OrderStatus): Promise<Order> {
+  return request<Order>(`orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+}
+
+export function saveStock(data: StockInput, id?: number): Promise<Stock> {
+  return request<Stock>(id ? `stocks/${id}` : 'stocks', { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) });
 }
 
 export function saveCustomer(data: CustomerInput, id?: number): Promise<Customer> {

@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,7 +31,7 @@ public class StockDAOImpl implements StockDAO {
         final String insertSQL = "INSERT INTO stocks (productID, location, quantity, maxStock, reserved, active) VALUES(?, ?, ?, ?, ?, ?)";
 
         try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
-            PreparedStatement insertStmt = connection.prepareStatement(insertSQL)){
+            PreparedStatement insertStmt = connection.prepareStatement(insertSQL, Statement.RETURN_GENERATED_KEYS)){
 
             checkStmt.setInt(1, stock.getProductID());
             checkStmt.setString(2, stock.getLocation());
@@ -42,13 +43,17 @@ public class StockDAOImpl implements StockDAO {
             insertStmt.setInt(1, stock.getProductID());
             insertStmt.setString(2, stock.getLocation());
             insertStmt.setInt(3, stock.getQuantity());
-            insertStmt.setInt(5, stock.getMaxStock());
-            insertStmt.setInt(6, stock.getReserved());
-            insertStmt.setBoolean(7, stock.isActive());
+            insertStmt.setInt(4, stock.getMaxStock());
+            insertStmt.setInt(5, stock.getReserved());
+            insertStmt.setBoolean(6, stock.isActive());
 
             int affectedRows = insertStmt.executeUpdate();
             if(affectedRows == 0){
                 throw new SQLException("Inserting stock failed, no rows affected.");
+            }
+            try (ResultSet keys = insertStmt.getGeneratedKeys()) {
+                if (!keys.next()) throw new SQLException("No generated stock ID returned.");
+                stock.setStockID(keys.getInt(1));
             }
         }
     }
@@ -154,9 +159,11 @@ public class StockDAOImpl implements StockDAO {
     public void updateFullStock(Stock stock) throws StockNotFoundException, ProductNotFoundException, SQLException{
 
         final String checkSQL = "SELECT 1 FROM products WHERE productID = ?";
-        final String updateSQL = "UPDATE stocks SET productID = ?, location = ?, quantity = ?, max_stock = ?, reserved = ?, active = ? WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET productID = ?, location = ?, quantity = ?, maxStock = ?, reserved = ?, active = ? WHERE stockID = ?";
+        final String duplicateSQL = "SELECT 1 FROM stocks WHERE productID = ? AND location = ? AND stockID != ?";
 
         try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
+            PreparedStatement duplicateStmt = connection.prepareStatement(duplicateSQL);
             PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){
 
             //checking if I have a valid productID from products for the stock update, before building the updateStmt
@@ -166,13 +173,19 @@ public class StockDAOImpl implements StockDAO {
                     throw new ProductNotFoundException("Product with ID: "+ stock.getProductID() + " not found. Stock update failed");
                 }
             }
+            duplicateStmt.setInt(1, stock.getProductID());
+            duplicateStmt.setString(2, stock.getLocation());
+            duplicateStmt.setInt(3, stock.getStockID());
+            try (ResultSet duplicates = duplicateStmt.executeQuery()) {
+                if (duplicates.next()) throw new StockAlreadyExistsException("Stock already exists for this product and location.");
+            }
             updateStmt.setInt(1, stock.getProductID());
             updateStmt.setString(2, stock.getLocation());
             updateStmt.setInt(3, stock.getQuantity());
-            updateStmt.setInt(5, stock.getMaxStock());
-            updateStmt.setInt(6, stock.getReserved());
-            updateStmt.setBoolean(7, stock.isActive());
-            updateStmt.setInt(8, stock.getStockID());
+            updateStmt.setInt(4, stock.getMaxStock());
+            updateStmt.setInt(5, stock.getReserved());
+            updateStmt.setBoolean(6, stock.isActive());
+            updateStmt.setInt(7, stock.getStockID());
 
             int affectedRows = updateStmt.executeUpdate();
             if(affectedRows == 0){
@@ -246,7 +259,7 @@ public class StockDAOImpl implements StockDAO {
     public void reactivateStock(int stockID) throws StockNotFoundException, SQLException{
 
         final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
-        final String updateSQL = "UPDATE stocks SET active = false WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET active = true WHERE stockID = ?";
 
         try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
             PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){

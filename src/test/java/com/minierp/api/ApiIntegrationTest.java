@@ -2,6 +2,7 @@ package com.minierp.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.minierp.dao.stock.StockDAOImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,12 +59,13 @@ class ApiIntegrationTest {
     @Test
     void productWritesAreValidatedAndPersisted() throws Exception {
         String body = """
-                {"name":"  Testartikel  ","description":null,"weight":"0.250","price":"19.95","minStockThreshold":3}
+                {"name":"  Testartikel  ","description":null,"weight":"250","price":"19.95","minStockThreshold":3}
                 """;
         var created = request("POST", "/products", body);
         assertEquals(201, created.statusCode(), created.body());
         int id = json.readTree(created.body()).get("productID").asInt();
         assertEquals("Testartikel", json.readTree(created.body()).get("name").asText());
+        assertEquals(250, json.readTree(created.body()).get("weight").asInt());
         assertEquals(409, request("POST", "/products", body).statusCode());
         assertEquals(400, request("POST", "/products", body.replace("19.95", "-1")).statusCode());
         assertEquals(400, request("POST", "/products", body.replace(":3", ":1.5")).statusCode());
@@ -87,6 +89,76 @@ class ApiIntegrationTest {
         var unsupported = client.send(HttpRequest.newBuilder(uri("/products"))
                 .header("Content-Type", "text/plain").POST(HttpRequest.BodyPublishers.ofString("{}")).build(), HttpResponse.BodyHandlers.ofString());
         assertEquals(415, unsupported.statusCode());
+    }
+
+    @Test
+    void stocksCanBeCreatedEditedAndValidated() throws Exception {
+        int productID = createProduct();
+        String body = "{\"productID\":" + productID + ",\"location\":\"a-01-02\",\"quantity\":10,\"maxStock\":50,\"reserved\":2}";
+        var created = request("POST", "/stocks", body);
+        assertEquals(201, created.statusCode(), created.body());
+        int id = json.readTree(created.body()).get("stockID").asInt();
+        assertTrue(id > 0);
+        assertEquals("A-01-02", json.readTree(created.body()).get("location").asText());
+        assertEquals(50, json.readTree(created.body()).get("maxStock").asInt());
+        assertEquals(2, json.readTree(created.body()).get("reserved").asInt());
+        assertEquals(409, request("POST", "/stocks", body).statusCode());
+        assertEquals(400, request("POST", "/stocks", body.replace(":10", ":60")).statusCode());
+        assertEquals(400, request("POST", "/stocks", body.replace("\"reserved\":2", "\"reserved\":11")).statusCode());
+        var updated = request("PUT", "/stocks/" + id, body.replace(":10", ":15").replace("a-01-02", "B-02-03"));
+        assertEquals(200, updated.statusCode(), updated.body());
+        assertEquals(15, json.readTree(updated.body()).get("quantity").asInt());
+        assertEquals("B-02-03", json.readTree(request("GET", "/stocks/" + id, null).body()).get("location").asText());
+        var second = request("POST", "/stocks", body);
+        assertEquals(201, second.statusCode());
+        assertEquals(409, request("PUT", "/stocks/" + id, body).statusCode());
+        assertEquals(2, json.readTree(request("GET", "/stocks", null).body()).size());
+        var stockDAO = new StockDAOImpl(connection);
+        stockDAO.deactivateStock(id);
+        assertEquals(1, json.readTree(request("GET", "/stocks", null).body()).size());
+        stockDAO.reactivateStock(id);
+        assertEquals(2, json.readTree(request("GET", "/stocks", null).body()).size());
+    }
+
+    @Test
+    void ordersUseCataloguePricesAndAllowOnlyValidStatusTransitions() throws Exception {
+        int productID = createProduct();
+        var customer = request("POST", "/customers", """
+                {"name":"Auftragskunde","address":"Berlin","birthdate":null,"email":"order@example.test","phone":"123"}
+                """);
+        int customerID = json.readTree(customer.body()).get("customerID").asInt();
+        String body = "{\"customerID\":" + customerID + ",\"discount\":\"0.10\",\"tax\":\"0.19\",\"items\":[{\"productID\":" + productID + ",\"quantity\":2}]}";
+        var created = request("POST", "/orders", body);
+        assertEquals(201, created.statusCode(), created.body());
+        var detail = json.readTree(created.body());
+        int id = detail.get("order").get("orderID").asInt();
+        assertTrue(id > 0);
+        assertEquals(107.10, detail.get("order").get("totalPrice").asDouble());
+        assertEquals(50, detail.get("items").get(0).get("unitPrice").asInt());
+        assertEquals(2, detail.get("items").get(0).get("quantity").asInt());
+        assertEquals(200, request("GET", "/orders/" + id, null).statusCode());
+        assertEquals(400, request("PATCH", "/orders/" + id + "/status", "{\"status\":\"SHIPPED\"}").statusCode());
+        var confirmed = request("PATCH", "/orders/" + id + "/status", "{\"status\":\"CONFIRMED\"}");
+        assertEquals(200, confirmed.statusCode(), confirmed.body());
+        assertEquals("CONFIRMED", json.readTree(confirmed.body()).get("orderStatus").asText());
+        assertEquals(400, request("POST", "/orders", body.replace("\"quantity\":2", "\"quantity\":0")).statusCode());
+        assertEquals(404, request("POST", "/orders", body.replace("\"customerID\":" + customerID, "\"customerID\":999")).statusCode());
+        assertEquals(400, request("POST", "/orders", body.replace("\"quantity\":2", "\"quantity\":2,\"unitPrice\":1")).statusCode());
+        assertEquals(200, request("PUT", "/products/" + productID, """
+                {"name":"Artikel","description":null,"weight":"250","price":"60.00","minStockThreshold":3}
+                """).statusCode());
+        var historical = json.readTree(request("GET", "/orders/" + id, null).body());
+        assertEquals(50, historical.get("items").get(0).get("unitPrice").asInt());
+        assertEquals(107.10, historical.get("order").get("totalPrice").asDouble());
+        assertEquals(1, json.readTree(request("GET", "/orders", null).body()).size());
+    }
+
+    private int createProduct() throws Exception {
+        var created = request("POST", "/products", """
+                {"name":"Artikel","description":null,"weight":"250","price":"50.00","minStockThreshold":3}
+                """);
+        assertEquals(201, created.statusCode(), created.body());
+        return json.readTree(created.body()).get("productID").asInt();
     }
 
     private URI uri(String path) { return URI.create("http://127.0.0.1:" + api.port() + "/api" + path); }

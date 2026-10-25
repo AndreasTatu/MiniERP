@@ -31,7 +31,8 @@ public class StockServiceImpl implements StockService{
         if (stock.getProductID() <= 0)
             throw new IllegalArgumentException("Invalid productID: must be greater than 0");
 
-        String location = stock.getLocation();
+        String location = stock.getLocation() == null ? null : stock.getLocation().trim().toUpperCase(java.util.Locale.ROOT);
+        stock.setLocation(location);
         if (location == null || location.isBlank())
             throw new IllegalArgumentException("Location must not be null or blank");
 
@@ -59,7 +60,8 @@ public class StockServiceImpl implements StockService{
 
         //check product existence
         try{
-            productDAO.findProductByID(stock.getProductID());
+            if (!productDAO.findProductByID(stock.getProductID()).isActive())
+                throw new IllegalArgumentException("Der Artikel ist nicht aktiv.");
         }
         catch (SQLException e) {
             throw new RuntimeException("Database access error while checking product existence", e);
@@ -133,7 +135,8 @@ public class StockServiceImpl implements StockService{
         if (stock.getProductID() <= 0)
             throw new IllegalArgumentException("Invalid productID: must be greater than 0");
 
-        String location = stock.getLocation();
+        String location = stock.getLocation() == null ? null : stock.getLocation().trim().toUpperCase(java.util.Locale.ROOT);
+        stock.setLocation(location);
         if (location == null || location.isBlank())
             throw new IllegalArgumentException("Location must not be null or blank");
 
@@ -161,7 +164,8 @@ public class StockServiceImpl implements StockService{
 
         //check product existence
         try{
-            productDAO.findProductByID(stock.getProductID());
+            if (!productDAO.findProductByID(stock.getProductID()).isActive())
+                throw new IllegalArgumentException("Der Artikel ist nicht aktiv.");
         }
         catch (SQLException e) {
             throw new RuntimeException("Database access error while checking product existence", e);

@@ -52,6 +52,7 @@ public class OrderDAOImpl implements OrderDAO {
             }
             if (ownsTransaction) connection.commit();
             else connection.releaseSavepoint(savepoint);
+            order.setOrderID(orderID);
         } catch (SQLException | RuntimeException exception) {
             try {
                 if (ownsTransaction) connection.rollback();

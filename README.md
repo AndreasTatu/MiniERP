@@ -44,8 +44,13 @@ Lokale Datenbanken, Zugangsdaten in `*.local`, Abhängigkeiten und Build-Ausgabe
 
 ## Nutzbare Funktionen
 
-- Übersicht mit echten Kunden- und Produktzahlen.
+- Übersicht mit echten Kunden-, Produkt-, Auftrags- und Lagerkennzahlen.
 - Kunden und Produkte durchsuchen, anlegen und bearbeiten; Formulare zeigen Fehler der API an.
+- Artikelgewichte werden in Gramm gespeichert und übertragen (`weight`); Formular und Tabellen zeigen die Einheit an.
+- Aufträge mit Kunde und mehreren Positionen anlegen, nach Status filtern und Details ansehen. Neue Positionen übernehmen ihre Preise serverseitig aus dem Produktkatalog. Gespeicherte Einzelpreise bleiben bei späteren Preisänderungen am Produkt erhalten.
+- Statusfolge: Offen → Bestätigt → Versendet → Geliefert. Offene und bestätigte Aufträge können storniert werden.
+- Lagerbestände nach Artikel und Lagerplatz anlegen und bearbeiten, inklusive Reservierungen und Kapazität. Verfügbar = Bestand − reserviert. Mindestbestände werden über alle aktiven Lagerplätze eines Artikels summiert; Artikel ohne Bestand werden ebenfalls berücksichtigt.
+- Bestände und Reservierungen werden manuell gepflegt. Auftragsanlage und Statuswechsel verändern keine Lagerzahlen.
 - Laden, leere Listen, Verbindungsfehler und erfolgreiche Speicherungen sind in der Oberfläche abgebildet.
 - Die Auftragserstellung im Service berechnet `Positionssumme × (1 − Rabatt) × (1 + Steuer)`. Rabatt und Steuer sind Anteile (`0.10` = 10 %, `0.19` = 19 %); der Gesamtbetrag wird abschließend kaufmännisch auf zwei Nachkommastellen gerundet. Auftrag und Positionen werden gemeinsam gespeichert oder zurückgerollt.
 
@@ -60,8 +65,21 @@ Antworten sind JSON. Kunden- und Produktlisten enthalten aktive Datensätze. Neu
 | GET / PUT | `/api/customers/{id}` | Kunden lesen / bearbeiten |
 | GET / POST | `/api/products` | Produkte auflisten / anlegen |
 | GET / PUT | `/api/products/{id}` | Produkte lesen / bearbeiten |
+| GET / POST | `/api/orders` | Aufträge auflisten / anlegen |
+| GET | `/api/orders/{id}` | Auftrag samt Positionen als `{ order, items }` lesen |
+| PATCH | `/api/orders/{id}/status` | Status ändern, JSON: `{ "status": "CONFIRMED" }` |
+| GET / POST | `/api/stocks` | Aktive Lagerbestände auflisten / anlegen |
+| GET / PUT | `/api/stocks/{id}` | Lagerbestand lesen / bearbeiten |
 
-POST und PUT erwarten `Content-Type: application/json`. Kundenfelder: `name`, `address`, `birthdate` (ISO-Datum oder null), `email`, `phone`. Produktfelder: `name`, `description` (optional), `weight`, `price`, `minStockThreshold`. Dezimalwerte können als JSON-Zahl oder Dezimalstring übertragen werden. IDs und Aktivstatus sind keine schreibbaren Formularfelder.
+POST, PUT und PATCH erwarten `Content-Type: application/json`. Kundenfelder: `name`, `address`, `birthdate` (ISO-Datum oder null), `email`, `phone`. Produktfelder: `name`, `description` (optional), `weight` (Gramm), `price`, `minStockThreshold`. Lagerfelder: `productID`, `location` (z. B. `A-01-02`), `quantity`, `reserved`, `maxStock`. Dezimalwerte können als JSON-Zahl oder Dezimalstring übertragen werden. IDs und Aktivstatus sind keine schreibbaren Formularfelder.
+
+Ein neuer Auftrag wird beispielsweise so angelegt (Prozentfelder im Frontend werden in Anteile für die API umgerechnet):
+
+```json
+{ "customerID": 1, "discount": "0.10", "tax": "0.19", "items": [{ "productID": 1, "quantity": 2 }] }
+```
+
+Die API bestimmt Auftragsdatum (Zeitzone Europe/Berlin), Status, Einzelpreise und Gesamtbetrag. Die POST-Antwort enthält den gespeicherten Auftrag und seine Positionen. Statuswerte: `PENDING`, `CONFIRMED`, `SHIPPED`, `DELIVERED`, `CANCELLED`.
 
 Fehlerformat: `{ "error": "Beschreibung" }`. Statuscodes: 400 ungültige Eingabe, 404 unbekannter Datensatz/Endpunkt, 409 Duplikat, 405 unzulässige Methode, 413 zu große Anfrage, 415 falscher Inhaltstyp, 500 interner Fehler. POST liefert 201 und den gespeicherten Datensatz mit `Location`-Header.
 
@@ -71,10 +89,11 @@ Fehlerformat: `{ "error": "Beschreibung" }`. Statuscodes: 400 ungültige Eingabe
 mvn test
 cd frontend
 pnpm run build
+pnpm test
 ```
 
-Die Integrationstests verwenden eigene Datenbanken im Arbeitsspeicher. Sie prüfen unter anderem HTTP-CRUD, Duplikate, Geburtsdaten, Produktvalidierung, Rabatt-/Steuerberechnung und Transaktions-Rollback. GitHub Actions führt Java-Tests und Frontend-Build bei Pushes und Pull Requests aus.
+Die Integrationstests verwenden eigene Datenbanken im Arbeitsspeicher. Sie prüfen unter anderem HTTP-CRUD, Duplikate, Geburtsdaten, Produkt- und Lagervalidierung, Statuswechsel, Rabatt-/Steuerberechnung und Transaktions-Rollback. Frontend-Tests prüfen die exakte Dezimalberechnung der Vorschau sowie die Zusammenrechnung verfügbarer Bestände. GitHub Actions führt Java-Tests, Frontend-Tests und Frontend-Build bei Pushes und Pull Requests aus.
 
 Repository: https://github.com/AndreasTatu/MiniERP. Aktueller Entwicklungsbranch: `codex/erp-frontend-api`; der lokale Git-Remote heißt `AndreasTatu`.
 
-Als nächste Ausbauschritte stehen die Auftragsoberfläche, die Lageroberfläche, Archivierung/Reaktivierung und versionierte Datenbankmigrationen an.
+Als nächste Ausbauschritte stehen automatische Lagerreservierungen und Buchungen, Archivierung/Reaktivierung in der Oberfläche sowie versionierte Datenbankmigrationen an.
