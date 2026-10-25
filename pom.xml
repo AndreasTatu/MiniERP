@@ -21,6 +21,18 @@
             <version>3.45.2.0</version>
         </dependency>
 
+        <!-- JSON for the HTTP API -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.18.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>2.18.2</version>
+        </dependency>
+
         <!-- H2 Database for testing -->
         <dependency>
             <groupId>com.h2database</groupId>

@@ -13,7 +13,7 @@ public class DatabaseConnection {
 
     // JDBC-URL zur SQLite-Datenbankdatei im Projektverzeichnis.
     // Beim ersten Zugriff wird die Datei 'miniERP.db' automatisch erstellt.
-    private static final String URL = "jdbc:sqlite:miniERP.db";
+    private static final String URL = System.getenv().getOrDefault("MINIERP_DB_URL", "jdbc:sqlite:miniERP.db");
 
     // Die einzige Datenbankverbindung (Singleton-Prinzip)
     private static Connection connection;

@@ -26,6 +26,12 @@ public class OrderItem {
         this.unitPrice = unitPrice;
     }
 
+    public OrderItem(int productID, int quantity, BigDecimal unitPrice) {
+        this.productID = productID;
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+    }
+
     public int getOrderItemID() {
         return orderItemID;
     }
