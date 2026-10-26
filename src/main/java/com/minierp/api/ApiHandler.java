@@ -11,6 +11,8 @@ import com.minierp.model.product.Product;
 import com.minierp.model.order.Order;
 import com.minierp.model.order.OrderItem;
 import com.minierp.model.order.OrderStatus;
+import com.minierp.model.order.OrderAllocation;
+import com.minierp.model.order.StockSelection;
 import com.minierp.model.stock.Stock;
 import com.minierp.service.customer.CustomerService;
 import com.minierp.service.product.ProductService;
@@ -64,6 +66,8 @@ final class ApiHandler implements HttpHandler {
                 response = error(409, "E-Mail-Adresse oder Produktname wird bereits verwendet.");
             } catch (StockAlreadyExistsException exception) {
                 response = error(409, "Für diesen Artikel existiert an diesem Lagerplatz bereits ein Bestand.");
+            } catch (StockConflictException exception) {
+                response = error(409, exception.getMessage());
             } catch (JsonProcessingException exception) {
                 response = error(400, "Ungültige JSON-Daten oder ungültiges Datums-/Zahlenformat.");
             } catch (IllegalArgumentException exception) {
@@ -160,7 +164,8 @@ final class ApiHandler implements HttpHandler {
         int id = Integer.parseInt(parts[3]);
         if (parts.length == 5) {
             requireMethod(exchange, "PATCH");
-            orders.updateOrderStatus(id, body(exchange, StatusRequest.class).status);
+            var request = body(exchange, StatusRequest.class);
+            orders.updateOrderStatus(id, request.status, request.allocations);
             return new Response(200, orders.findOrderByID(id), null);
         }
         requireMethod(exchange, "GET");
@@ -168,7 +173,7 @@ final class ApiHandler implements HttpHandler {
     }
 
     private OrderDetail orderDetail(int id) {
-        return new OrderDetail(orders.findOrderByID(id), orders.findAllOrderItemsByOrder(id));
+        return new OrderDetail(orders.findOrderByID(id), orders.findAllOrderItemsByOrder(id), orders.findAllocationsByOrder(id));
     }
 
     private Response stockRoute(HttpExchange exchange) throws IOException, SQLException {
@@ -176,10 +181,14 @@ final class ApiHandler implements HttpHandler {
         String[] parts = path.split("/");
         if (parts.length == 3) {
             requireMethod(exchange, "GET", "POST");
-            if (exchange.getRequestMethod().equals("GET")) return new Response(200, stocks.findAllActiveStock(), null);
+            if (exchange.getRequestMethod().equals("GET")) {
+                var views = new java.util.ArrayList<StockView>();
+                for (var stock : stocks.findAllActiveStock()) views.add(stockView(stock));
+                return new Response(200, views, null);
+            }
             var stock = body(exchange, StockRequest.class).toStock(0, true);
             stocks.createStock(stock);
-            return new Response(201, stocks.findStockByStockID(stock.getStockID()), path + "/" + stock.getStockID());
+            return new Response(201, stockView(stocks.findStockByStockID(stock.getStockID())), path + "/" + stock.getStockID());
         }
         int id = Integer.parseInt(parts[3]);
         requireMethod(exchange, "GET", "PUT");
@@ -188,7 +197,14 @@ final class ApiHandler implements HttpHandler {
             stocks.updateFullStock(body(exchange, StockRequest.class).toStock(id, current.isActive()));
             current = stocks.findStockByStockID(id);
         }
-        return new Response(200, current, null);
+        return new Response(200, stockView(current), null);
+    }
+
+    private StockView stockView(Stock stock) throws SQLException {
+        long orderReserved = stocks.findOrderReservedQuantity(stock.getStockID());
+        if (orderReserved > stock.getReserved()) throw new StockConflictException("Die Lagerreservierungen sind inkonsistent. Bitte den Lagerbestand prüfen.");
+        return new StockView(stock.getStockID(), stock.getProductID(), stock.getLocation(), stock.getQuantity(),
+                stock.getMaxStock(), stock.getReserved(), stock.isActive(), orderReserved, stock.getReserved() - orderReserved);
     }
 
     private <T> T body(HttpExchange exchange, Class<T> type) throws IOException {
@@ -249,8 +265,10 @@ final class ApiHandler implements HttpHandler {
 
     record OrderRequest(int customerID, BigDecimal discount, BigDecimal tax, List<OrderLineRequest> items) {}
     record OrderLineRequest(int productID, int quantity) {}
-    record StatusRequest(OrderStatus status) {}
-    record OrderDetail(Order order, List<OrderItem> items) {}
+    record StatusRequest(OrderStatus status, List<StockSelection> allocations) {}
+    record OrderDetail(Order order, List<OrderItem> items, List<OrderAllocation> allocations) {}
+    record StockView(int stockID, int productID, String location, int quantity, int maxStock,
+                     int reserved, boolean active, long orderReserved, long manualReserved) {}
     record StockRequest(int productID, String location, Integer quantity, Integer maxStock, Integer reserved) {
         Stock toStock(int id, boolean active) {
             if (quantity == null || maxStock == null || reserved == null)

@@ -1,244 +1,119 @@
 package com.minierp.service.stock;
 
-import com.minierp.common.exceptions.ProductNotFoundException;
-import com.minierp.common.exceptions.StockAlreadyExistsException;
-import com.minierp.common.exceptions.StockNotFoundException;
+import com.minierp.common.database.JdbcTransactions;
+import com.minierp.common.exceptions.StockConflictException;
 import com.minierp.dao.product.ProductDAO;
 import com.minierp.dao.stock.StockDAO;
 import com.minierp.model.stock.Stock;
-
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Locale;
 
-public class StockServiceImpl implements StockService{
+public class StockServiceImpl implements StockService {
+    private final StockDAO stocks;
+    private final ProductDAO products;
+    private final JdbcTransactions transactions;
 
-    private final StockDAO stockDAO;
-    private final ProductDAO productDAO;
-
-    public StockServiceImpl(StockDAO stockDAO, ProductDAO productDAO) {
-        this.stockDAO = stockDAO;
-        this.productDAO = productDAO;
+    public StockServiceImpl(StockDAO stocks, ProductDAO products, JdbcTransactions transactions) {
+        this.stocks = stocks; this.products = products; this.transactions = transactions;
     }
 
+    @Override
+    public void createStock(Stock stock) {
+        validate(stock);
+        write(() -> { requireActiveProduct(stock.getProductID()); stocks.createStock(stock); return null; });
+    }
 
     @Override
-    public void createStock(Stock stock) throws StockAlreadyExistsException, ProductNotFoundException{
+    public Stock findStockByStockID(int id) { positiveID(id); return read(() -> stocks.findStockByStockID(id)); }
 
-        if (stock == null){
-            throw new IllegalArgumentException("stock-object must not be null");
-        }
+    @Override
+    public List<Stock> findStockByProductID(int id) { positiveID(id); return read(() -> stocks.findStockByProductID(id)); }
 
-        if (stock.getProductID() <= 0)
-            throw new IllegalArgumentException("Invalid productID: must be greater than 0");
+    @Override
+    public List<Stock> findAllActiveStock() { return read(stocks::findAllActiveStock); }
 
-        String location = stock.getLocation() == null ? null : stock.getLocation().trim().toUpperCase(java.util.Locale.ROOT);
+    @Override
+    public List<Stock> findAllStock() { return read(stocks::findAllStock); }
+
+    @Override
+    public long findOrderReservedQuantity(int id) { positiveID(id); return read(() -> stocks.findOrderReservedQuantity(id)); }
+
+    @Override
+    public void updateFullStock(Stock stock) {
+        validate(stock); positiveID(stock.getStockID());
+        write(() -> {
+            var current = stocks.findStockByStockID(stock.getStockID());
+            long managed = checkReservations(current, stock.getReserved());
+            if (managed > 0 && (stock.getProductID() != current.getProductID()
+                    || !stock.getLocation().equals(current.getLocation()) || stock.isActive() != current.isActive()))
+                throw new StockConflictException("Artikel und Lagerplatz können bei Auftragsreservierungen nicht verändert werden.");
+            requireActiveProduct(stock.getProductID());
+            stocks.updateFullStock(stock);
+            return null;
+        });
+    }
+
+    @Override
+    public void updateStockQuantityAndReserved(int id, int quantity, int reserved) {
+        positiveID(id);
+        write(() -> {
+            var current = stocks.findStockByStockID(id);
+            validateQuantities(quantity, current.getMaxStock(), reserved);
+            checkReservations(current, reserved);
+            stocks.updateStockQuantityAndReserved(id, quantity, reserved);
+            return null;
+        });
+    }
+
+    @Override
+    public void deactivateStock(int id) {
+        positiveID(id);
+        write(() -> {
+            stocks.findStockByStockID(id);
+            if (stocks.findOrderReservedQuantity(id) > 0)
+                throw new StockConflictException("Ein Lagerbestand mit Auftragsreservierungen kann nicht deaktiviert werden.");
+            stocks.deactivateStock(id); return null;
+        });
+    }
+
+    @Override
+    public void reactivateStock(int id) {
+        positiveID(id);
+        write(() -> { requireActiveProduct(stocks.findStockByStockID(id).getProductID()); stocks.reactivateStock(id); return null; });
+    }
+
+    private long checkReservations(Stock current, int nextReserved) throws SQLException {
+        long managed = stocks.findOrderReservedQuantity(current.getStockID());
+        if (current.getReserved() < managed)
+            throw new StockConflictException("Der Lagerbestand passt nicht zu seinen Auftragsreservierungen. Bitte prüfen.");
+        if (nextReserved < managed)
+            throw new StockConflictException("Mindestens " + managed + " Stück sind durch Aufträge reserviert. Diese Reservierungen können hier nicht reduziert werden.");
+        return managed;
+    }
+
+    private void requireActiveProduct(int id) throws SQLException {
+        if (!products.findProductByID(id).isActive()) throw new IllegalArgumentException("Der Artikel ist nicht aktiv.");
+    }
+
+    private void validate(Stock stock) {
+        if (stock == null) throw new IllegalArgumentException("Ein Lagerbestand ist erforderlich.");
+        positiveID(stock.getProductID());
+        String location = stock.getLocation() == null ? "" : stock.getLocation().trim().toUpperCase(Locale.ROOT);
+        if (!location.matches("[A-Z]-\\d{2}-\\d{2}")) throw new IllegalArgumentException("Der Lagerplatz muss dem Format A-01-02 entsprechen.");
         stock.setLocation(location);
-        if (location == null || location.isBlank())
-            throw new IllegalArgumentException("Location must not be null or blank");
-
-        if (!location.matches("[A-Z]-\\d{2}-\\d{2}"))
-            throw new IllegalArgumentException("Location must match format 'A-01-02'");
-
-        int quantity = stock.getQuantity();
-        int maxStock = stock.getMaxStock();
-        int reserved = stock.getReserved();
-
-        if (quantity < 0)
-            throw new IllegalArgumentException("Quantity must not be negative");
-
-        if (maxStock <= 0)
-            throw new IllegalArgumentException("maxStock must be greater than 0");
-
-        if (quantity > maxStock)
-            throw new IllegalArgumentException("Quantity must not exceed maxStock");
-
-        if (reserved < 0)
-            throw new IllegalArgumentException("Reserved amount must not be negative");
-
-        if (reserved > quantity)
-            throw new IllegalArgumentException("Reserved amount must not exceed quantity");
-
-        //check product existence
-        try{
-            if (!productDAO.findProductByID(stock.getProductID()).isActive())
-                throw new IllegalArgumentException("Der Artikel ist nicht aktiv.");
-        }
-        catch (SQLException e) {
-            throw new RuntimeException("Database access error while checking product existence", e);
-        }
-
-        //create stock entry
-        try{
-            stockDAO.createStock(stock);
-        }
-        catch (SQLException e) {
-            throw new RuntimeException("Database access error", e);
-        }
-
+        validateQuantities(stock.getQuantity(), stock.getMaxStock(), stock.getReserved());
     }
 
-
-    @Override
-    public Stock findStockByStockID(int stockID) throws StockNotFoundException {
-        if (stockID <= 0) {
-            throw new IllegalArgumentException("stockID must be greater than 0");
-        }
-
-        try {
-            return stockDAO.findStockByStockID(stockID);
-        } catch (SQLException e) {
-            throw new RuntimeException("Database access error", e);
-        }
+    private void validateQuantities(int quantity, int capacity, int reserved) {
+        if (quantity < 0 || capacity <= 0 || quantity > capacity || reserved < 0 || reserved > quantity)
+            throw new IllegalArgumentException("Bestand und Reservierung müssen nichtnegativ sein; Reservierung ≤ Bestand ≤ Kapazität, Kapazität > 0.");
     }
 
-
-    @Override
-    public List<Stock> findStockByProductID(int productID){
-        if (productID <= 0){
-            throw new IllegalArgumentException("productID must be positive");
-        }
-
-        try {
-            return stockDAO.findStockByProductID(productID);
-        }
-        catch (SQLException e) {
-            throw new RuntimeException("Database access error", e);
-        }
+    private void positiveID(int id) { if (id <= 0) throw new IllegalArgumentException("Die ID muss positiv sein."); }
+    private <T> T read(JdbcTransactions.Work<T> work) {
+        try { return work.run(); }
+        catch (SQLException exception) { throw new RuntimeException("Database access error", exception); }
     }
-
-    public List<Stock> findAllActiveStock() {
-        try {
-            return stockDAO.findAllActiveStock();
-        } catch (SQLException e) {
-            throw new RuntimeException("Database access error", e);
-        }
-    }
-
-    public List<Stock> findAllStock() {
-        try {
-            return stockDAO.findAllStock();
-        } catch (SQLException e) {
-            throw new RuntimeException("Database access error", e);
-        }
-    }
-
-
-    @Override
-    public void updateFullStock(Stock stock) throws StockNotFoundException, ProductNotFoundException{
-
-        if (stock == null)
-            throw new IllegalArgumentException("stock-object must not be null");
-
-        if (stock.getStockID() <= 0)
-            throw new IllegalArgumentException("Invalid stockID: must be greater than 0");
-
-        if (stock.getProductID() <= 0)
-            throw new IllegalArgumentException("Invalid productID: must be greater than 0");
-
-        String location = stock.getLocation() == null ? null : stock.getLocation().trim().toUpperCase(java.util.Locale.ROOT);
-        stock.setLocation(location);
-        if (location == null || location.isBlank())
-            throw new IllegalArgumentException("Location must not be null or blank");
-
-        if (!location.matches("[A-Z]-\\d{2}-\\d{2}"))
-            throw new IllegalArgumentException("Location must match format 'A-01-02'");
-
-        int quantity = stock.getQuantity();
-        int maxStock = stock.getMaxStock();
-        int reserved = stock.getReserved();
-
-        if (quantity < 0)
-            throw new IllegalArgumentException("Quantity must not be negative");
-
-        if (maxStock <= 0)
-            throw new IllegalArgumentException("maxStock must be greater than 0");
-
-        if (quantity > maxStock)
-            throw new IllegalArgumentException("Quantity must not exceed maxStock");
-
-        if (reserved < 0)
-            throw new IllegalArgumentException("Reserved amount must not be negative");
-
-        if (reserved > quantity)
-            throw new IllegalArgumentException("Reserved amount must not exceed quantity");
-
-        //check product existence
-        try{
-            if (!productDAO.findProductByID(stock.getProductID()).isActive())
-                throw new IllegalArgumentException("Der Artikel ist nicht aktiv.");
-        }
-        catch (SQLException e) {
-            throw new RuntimeException("Database access error while checking product existence", e);
-        }
-
-        //update stock entry
-        try{
-            stockDAO.updateFullStock(stock);
-        }
-        catch (SQLException e) {
-            throw new RuntimeException("Database access error", e);
-        }
-
-    }
-
-
-    @Override
-    public void updateStockQuantityAndReserved(int stockID, int quantity, int reserved) throws StockNotFoundException{
-
-        if (stockID <= 0)
-            throw new IllegalArgumentException("stockID must be greater than 0");
-
-        if (quantity < 0)
-            throw new IllegalArgumentException("quantity must not be negative");
-
-        int maxStock = findStockByStockID(stockID).getMaxStock();
-        if (quantity > maxStock)
-            throw new IllegalArgumentException("quantity must not exceed maxStock");
-
-        if (reserved < 0)
-            throw new IllegalArgumentException("reserved must not be negative");
-
-        if (reserved > quantity)
-            throw new IllegalArgumentException("reserved must not exceed quantity");
-
-        try {
-            stockDAO.updateStockQuantityAndReserved(stockID, quantity, reserved);
-        } catch (SQLException e) {
-            throw new RuntimeException("Database access error while updating stock quantity and reserved", e);
-        }
-    }
-
-
-    @Override
-    public void deactivateStock(int stockID) throws StockNotFoundException{
-
-        if (stockID <= 0)
-            throw new IllegalArgumentException("stockID must be positive");
-
-        try{
-            stockDAO.deactivateStock(stockID);
-        } catch (SQLException e) {
-            throw new RuntimeException("Database access error", e);
-        }
-
-    }
-
-
-    @Override
-    public void reactivateStock(int stockID) throws StockNotFoundException{
-
-        if (stockID <= 0)
-            throw new IllegalArgumentException("stockID must be positive");
-
-        try{
-            stockDAO.reactivateStock(stockID);
-        } catch (SQLException e) {
-            throw new RuntimeException("Database access error", e);
-        }
-
-    }
-
-
-
-
+    private <T> T write(JdbcTransactions.Work<T> work) { return read(() -> transactions.execute(work)); }
 }

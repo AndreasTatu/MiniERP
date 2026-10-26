@@ -81,6 +81,17 @@ public class TestDatabaseConnection {
                     UNIQUE (productID, location),
                     FOREIGN KEY (productID) REFERENCES products(productID)
                 );
+
+                CREATE TABLE orderAllocations (
+                    allocationID INT AUTO_INCREMENT PRIMARY KEY,
+                    orderID INT NOT NULL REFERENCES orders(orderID),
+                    stockID INT NOT NULL REFERENCES stocks(stockID),
+                    productID INT NOT NULL REFERENCES products(productID),
+                    location VARCHAR(50) NOT NULL,
+                    quantity INT NOT NULL CHECK (quantity > 0),
+                    state VARCHAR(20) NOT NULL CHECK (state IN ('RESERVED', 'SHIPPED', 'RELEASED')),
+                    UNIQUE (orderID, stockID)
+                );
             """);
         }
     }

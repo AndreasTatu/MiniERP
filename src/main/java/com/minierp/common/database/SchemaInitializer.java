@@ -69,6 +69,19 @@ public final class SchemaInitializer {
                         FOREIGN KEY (productID) REFERENCES products(productID)
                     )
                     """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS orderAllocations (
+                        allocationID INTEGER PRIMARY KEY AUTOINCREMENT,
+                        orderID INTEGER NOT NULL REFERENCES orders(orderID),
+                        stockID INTEGER NOT NULL REFERENCES stocks(stockID),
+                        productID INTEGER NOT NULL REFERENCES products(productID),
+                        location TEXT NOT NULL,
+                        quantity INTEGER NOT NULL CHECK (quantity > 0),
+                        state TEXT NOT NULL CHECK (state IN ('RESERVED', 'SHIPPED', 'RELEASED')),
+                        UNIQUE (orderID, stockID)
+                    )
+                    """);
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_orderAllocations_stock_state ON orderAllocations(stockID, state)");
         }
     }
 }

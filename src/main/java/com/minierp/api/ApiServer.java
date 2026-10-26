@@ -2,13 +2,16 @@ package com.minierp.api;
 
 import com.minierp.common.database.DatabaseConnection;
 import com.minierp.common.database.SchemaInitializer;
+import com.minierp.common.database.JdbcTransactions;
 import com.minierp.dao.customer.CustomerDAOImpl;
 import com.minierp.dao.product.ProductDAOImpl;
 import com.minierp.dao.order.OrderDAOImpl;
+import com.minierp.dao.order.OrderAllocationDAOImpl;
 import com.minierp.dao.stock.StockDAOImpl;
 import com.minierp.service.customer.CustomerServiceImpl;
 import com.minierp.service.product.ProductServiceImpl;
 import com.minierp.service.order.OrderServiceImpl;
+import com.minierp.service.order.OrderInventoryWorkflow;
 import com.minierp.service.stock.StockServiceImpl;
 import com.sun.net.httpserver.HttpServer;
 
@@ -34,8 +37,12 @@ public final class ApiServer implements AutoCloseable {
         var customers = new CustomerServiceImpl(new CustomerDAOImpl(connection));
         var productDAO = new ProductDAOImpl(connection);
         var products = new ProductServiceImpl(productDAO);
-        var orders = new OrderServiceImpl(new OrderDAOImpl(connection), productDAO);
-        var stocks = new StockServiceImpl(new StockDAOImpl(connection), productDAO);
+        var transactions = new JdbcTransactions(connection);
+        var orderDAO = new OrderDAOImpl(connection);
+        var stockDAO = new StockDAOImpl(connection);
+        var inventory = new OrderInventoryWorkflow(orderDAO, productDAO, stockDAO, new OrderAllocationDAOImpl(connection), transactions);
+        var orders = new OrderServiceImpl(orderDAO, productDAO, inventory);
+        var stocks = new StockServiceImpl(stockDAO, productDAO, transactions);
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         // The existing DAOs share one JDBC connection. Serialize access until a pool is introduced.
         var executor = Executors.newSingleThreadExecutor();

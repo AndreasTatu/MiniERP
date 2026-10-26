@@ -182,3 +182,23 @@ h3 { margin: 0; font-size: 12px; font-weight: 600; }
 @media (max-width: 1150px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 740px) { nav { overflow-x: auto; } .nav-item { flex: 0 0 auto; } .check-filter { white-space: normal; font-size: 9px; } .filter-select { max-width: 120px; } }
 @media (max-width: 520px) { .modal-body { padding: 20px; } .order-line { grid-template-columns: minmax(0, 1fr) 65px 24px; gap: 8px; } .line-price { grid-column: 1/-1; margin-top: 0; text-align: left; display: flex; gap: 10px; align-items: center; } .line-price b { margin: 0; } .line-heading { flex-direction: column; gap: 6px; } .order-total { padding: 13px; font-size: 10px; } .order-total strong { font-size: 17px; } .order-meta { flex-wrap: wrap; } .list-toolbar .search { max-width: 65%; } }
+.allocation-picker { border-top: 1px solid #e8edf5; margin-top: 24px; padding-top: 23px !important; }
+.allocation-heading { display: flex; justify-content: space-between; gap: 15px; align-items: flex-start; margin-bottom: 18px; }
+.allocation-heading p { font-size: 10px; color: #939fb5; line-height: 1.6; margin: 7px 0 0; }
+.allocation-product { border: 1px solid #e5eaf4; border-radius: 8px; padding: 14px; margin-top: 12px; }
+.allocation-product-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; font-size: 11px; }
+.allocation-product-heading b { font-weight: 600; color: #74819b; }
+.allocation-product-heading>span { color: #b69461; font-size: 10px; white-space: nowrap; }
+.allocation-product-heading .allocation-complete { color: #6a9c82; }
+.allocation-row { display: grid; grid-template-columns: 1fr 1fr 75px; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid #f0f2f7; }
+.allocation-row>.location-code { justify-self: start; }
+.allocation-row>span:nth-child(2) { font-size: 10px; color: #95a0b6; }
+.allocation-row input { width: 100%; padding: 8px; font-size: 12px; color: #697b9e; border: 1px solid #dee5f0; border-radius: 6px; }
+.allocation-history { margin-top: 25px; }
+.allocation-history h3 { margin-bottom: 12px; }
+.allocation-state { color: #8997b1; font-size: 10px; }
+.allocation-state.reserved { color: #aa8d5f; }
+.allocation-state.shipped { color: #6ba389; }
+.legacy-allocation-note { background: #fff7e9; border: 1px solid #f0e0c6; border-radius: 7px; padding: 13px; font-size: 11px; color: #b29464; line-height: 1.6; margin-top: 22px; }
+.reservation-breakdown { display: block; font-size: 8px; color: #a1adbf; white-space: nowrap; margin-top: 4px; }
+@media (max-width: 520px) { .allocation-heading { flex-direction: column; } .allocation-product-heading { flex-wrap: wrap; } .allocation-row { grid-template-columns: 1fr 1fr 65px; gap: 7px; } }

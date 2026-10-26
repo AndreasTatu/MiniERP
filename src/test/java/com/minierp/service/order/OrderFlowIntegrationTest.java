@@ -1,13 +1,18 @@
 package com.minierp.service.order;
 
 import com.minierp.common.database.SchemaInitializer;
+import com.minierp.common.database.JdbcTransactions;
 import com.minierp.dao.customer.CustomerDAOImpl;
 import com.minierp.dao.order.OrderDAOImpl;
+import com.minierp.dao.order.OrderAllocationDAOImpl;
+import com.minierp.dao.stock.StockDAOImpl;
 import com.minierp.dao.product.ProductDAOImpl;
 import com.minierp.model.customer.Customer;
 import com.minierp.model.order.Order;
 import com.minierp.model.order.OrderItem;
 import com.minierp.model.order.OrderStatus;
+import com.minierp.model.order.StockSelection;
+import com.minierp.model.stock.Stock;
 import com.minierp.model.product.Product;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +33,7 @@ class OrderFlowIntegrationTest {
     private OrderServiceImpl service;
     private int customerID;
     private int productID;
+    private int stockID;
 
     @BeforeEach
     void start() throws Exception {
@@ -40,7 +46,11 @@ class OrderFlowIntegrationTest {
         products.createProduct(new Product("Artikel", null, BigDecimal.ONE, new BigDecimal("33.33"), 0));
         productID = products.findProductByName("Artikel").getProductID();
         dao = new OrderDAOImpl(connection);
-        service = new OrderServiceImpl(dao, products);
+        var stocks = new StockDAOImpl(connection);
+        var stock = new Stock(productID, "A-01-01", 20, 100, 0, true);
+        stocks.createStock(stock); stockID = stock.getStockID();
+        service = new OrderServiceImpl(dao, products, new OrderInventoryWorkflow(dao, products, stocks,
+                new OrderAllocationDAOImpl(connection), new JdbcTransactions(connection)));
     }
 
     @AfterEach
@@ -54,7 +64,7 @@ class OrderFlowIntegrationTest {
         var saved = service.findAllOrders().get(0);
         assertEquals(0, new BigDecimal("107.09").compareTo(saved.getTotalPrice()));
         assertEquals(1, service.findAllOrderItemsByOrder(saved.getOrderID()).size());
-        service.updateOrderStatus(saved.getOrderID(), OrderStatus.CONFIRMED);
+        service.updateOrderStatus(saved.getOrderID(), OrderStatus.CONFIRMED, List.of(new StockSelection(stockID, 3)));
         assertEquals(OrderStatus.CONFIRMED, service.findOrderByID(saved.getOrderID()).getOrderStatus());
         assertThrows(IllegalArgumentException.class, () -> service.updateOrderStatus(saved.getOrderID(), OrderStatus.DELIVERED));
     }

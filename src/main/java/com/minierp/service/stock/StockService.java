@@ -61,6 +61,7 @@ public interface StockService {
      * @throws SQLException if a database error occurs
      */
     List<Stock> findAllStock() throws SQLException;
+    long findOrderReservedQuantity(int stockID) throws SQLException;
 
 
 

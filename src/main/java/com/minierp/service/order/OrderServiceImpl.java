@@ -5,6 +5,8 @@ import com.minierp.dao.product.ProductDAO;
 import com.minierp.model.order.Order;
 import com.minierp.model.order.OrderItem;
 import com.minierp.model.order.OrderStatus;
+import com.minierp.model.order.OrderAllocation;
+import com.minierp.model.order.StockSelection;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -15,10 +17,12 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderDAO orderDAO;
     private final ProductDAO productDAO;
+    private final OrderInventoryWorkflow inventory;
 
-    public OrderServiceImpl(OrderDAO orderDAO, ProductDAO productDAO) {
+    public OrderServiceImpl(OrderDAO orderDAO, ProductDAO productDAO, OrderInventoryWorkflow inventory) {
         this.orderDAO = orderDAO;
         this.productDAO = productDAO;
+        this.inventory = inventory;
     }
 
     @Override
@@ -119,18 +123,15 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public void updateOrderStatus(int orderID, OrderStatus status) {
+    public void updateOrderStatus(int orderID, OrderStatus status, List<StockSelection> selection) {
         requirePositiveID(orderID);
-        if (status == null) throw new IllegalArgumentException("Order status must not be null.");
-        OrderStatus current = findOrderByID(orderID).getOrderStatus();
-        boolean allowed = current == status || switch (current) {
-            case PENDING -> status == OrderStatus.CONFIRMED || status == OrderStatus.CANCELLED;
-            case CONFIRMED -> status == OrderStatus.SHIPPED || status == OrderStatus.CANCELLED;
-            case SHIPPED -> status == OrderStatus.DELIVERED;
-            case DELIVERED, CANCELLED -> false;
-        };
-        if (!allowed) throw new IllegalArgumentException("Invalid order status transition.");
-        database(() -> { orderDAO.updateOrderStatus(orderID, status); return null; });
+        database(() -> { inventory.transition(orderID, status, selection); return null; });
+    }
+
+    @Override
+    public List<OrderAllocation> findAllocationsByOrder(int orderID) {
+        requirePositiveID(orderID);
+        return database(() -> inventory.findAllocations(orderID));
     }
 
     private void requirePositiveID(int id) {

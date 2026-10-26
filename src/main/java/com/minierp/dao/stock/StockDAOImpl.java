@@ -3,6 +3,7 @@ package com.minierp.dao.stock;
 import com.minierp.common.exceptions.ProductNotFoundException;
 import com.minierp.common.exceptions.StockAlreadyExistsException;
 import com.minierp.common.exceptions.StockNotFoundException;
+import com.minierp.common.exceptions.StockConflictException;
 import com.minierp.model.stock.Stock;
 
 import java.sql.Connection;
@@ -22,6 +23,42 @@ public class StockDAOImpl implements StockDAO {
     }
 
     //CRUD-Methods:
+
+    @Override
+    public long findOrderReservedQuantity(int stockID) throws SQLException {
+        try (var statement = connection.prepareStatement("SELECT COALESCE(SUM(quantity), 0) FROM orderAllocations WHERE stockID = ? AND state = 'RESERVED'")) {
+            statement.setInt(1, stockID);
+            try (var results = statement.executeQuery()) { results.next(); return results.getLong(1); }
+        }
+    }
+
+    @Override
+    public void reserveUnits(int stockID, int quantity) throws SQLException {
+        adjust("UPDATE stocks SET reserved = reserved + ? WHERE stockID = ? AND active = true AND quantity - reserved >= ?", stockID, quantity);
+    }
+
+    @Override
+    public void releaseUnits(int stockID, int quantity) throws SQLException {
+        adjust("UPDATE stocks SET reserved = reserved - ? WHERE stockID = ? AND active = true AND reserved >= ?", stockID, quantity);
+    }
+
+    @Override
+    public void shipReservedUnits(int stockID, int quantity) throws SQLException {
+        if (quantity <= 0) throw new IllegalArgumentException("Quantity must be positive.");
+        try (var statement = connection.prepareStatement("UPDATE stocks SET quantity = quantity - ?, reserved = reserved - ? WHERE stockID = ? AND active = true AND quantity >= ? AND reserved >= ?")) {
+            statement.setInt(1, quantity); statement.setInt(2, quantity); statement.setInt(3, stockID);
+            statement.setInt(4, quantity); statement.setInt(5, quantity);
+            if (statement.executeUpdate() != 1) throw new StockConflictException("Die reservierte Ware ist nicht mehr vollständig verfügbar. Bitte Lagerbestand prüfen.");
+        }
+    }
+
+    private void adjust(String sql, int stockID, int quantity) throws SQLException {
+        if (quantity <= 0) throw new IllegalArgumentException("Quantity must be positive.");
+        try (var statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, quantity); statement.setInt(2, stockID); statement.setInt(3, quantity);
+            if (statement.executeUpdate() != 1) throw new StockConflictException("Der Lagerbestand hat sich verändert oder reicht nicht aus. Bitte Auswahl neu laden.");
+        }
+    }
 
     // Create
     @Override

@@ -25,10 +25,12 @@ export type Order = {
   discount: string | number; tax: string | number; totalPrice: string | number; orderStatus: OrderStatus;
 };
 export type OrderItem = { orderItemID: number; orderID: number; productID: number; quantity: number; unitPrice: string | number };
-export type OrderDetail = { order: Order; items: OrderItem[] };
+export type OrderAllocation = { allocationID: number; orderID: number; stockID: number; productID: number; location: string; quantity: number; state: 'RESERVED' | 'SHIPPED' | 'RELEASED' };
+export type StockSelection = { stockID: number; quantity: number };
+export type OrderDetail = { order: Order; items: OrderItem[]; allocations: OrderAllocation[] };
 export type OrderInput = { customerID: number; discount: string; tax: string; items: { productID: number; quantity: number }[] };
 export type StockInput = { productID: number; location: string; quantity: number; maxStock: number; reserved: number };
-export type Stock = StockInput & { stockID: number; active: boolean };
+export type Stock = StockInput & { stockID: number; active: boolean; orderReserved: number; manualReserved: number };
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -63,8 +65,8 @@ export function createOrder(data: OrderInput): Promise<OrderDetail> {
   return request<OrderDetail>('orders', { method: 'POST', body: JSON.stringify(data) });
 }
 
-export function updateOrderStatus(id: number, status: OrderStatus): Promise<Order> {
-  return request<Order>(`orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+export function updateOrderStatus(id: number, status: OrderStatus, allocations?: StockSelection[]): Promise<Order> {
+  return request<Order>(`orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, ...(allocations ? { allocations } : {}) }) });
 }
 
 export function saveStock(data: StockInput, id?: number): Promise<Stock> {

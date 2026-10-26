@@ -20,6 +20,10 @@ public interface StockDAO {
     List<Stock> findStockByProductID(int productID) throws SQLException;
     List<Stock> findAllActiveStock() throws SQLException;
     List<Stock> findAllStock() throws SQLException;
+    long findOrderReservedQuantity(int stockID) throws SQLException;
+    void reserveUnits(int stockID, int quantity) throws SQLException;
+    void releaseUnits(int stockID, int quantity) throws SQLException;
+    void shipReservedUnits(int stockID, int quantity) throws SQLException;
 
     // Update
     void updateFullStock(Stock stock) throws StockNotFoundException, ProductNotFoundException, SQLException;

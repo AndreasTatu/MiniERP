@@ -4,6 +4,8 @@ import com.minierp.common.exceptions.OrderNotFoundException;
 import com.minierp.model.order.Order;
 import com.minierp.model.order.OrderItem;
 import com.minierp.model.order.OrderStatus;
+import com.minierp.model.order.OrderAllocation;
+import com.minierp.model.order.StockSelection;
 
 import java.util.List;
 
@@ -98,5 +100,9 @@ public interface OrderService {
      * @throws OrderNotFoundException if no order with the given ID exists
      * @throws RuntimeException if a database error occurs
      */
-    void updateOrderStatus(int orderID, OrderStatus newOrderStatus) throws OrderNotFoundException;
+    default void updateOrderStatus(int orderID, OrderStatus newOrderStatus) throws OrderNotFoundException {
+        updateOrderStatus(orderID, newOrderStatus, List.of());
+    }
+    void updateOrderStatus(int orderID, OrderStatus newOrderStatus, List<StockSelection> selection);
+    List<OrderAllocation> findAllocationsByOrder(int orderID);
 }
