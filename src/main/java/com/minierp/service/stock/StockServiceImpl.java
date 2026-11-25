@@ -44,6 +44,8 @@ public class StockServiceImpl implements StockService {
         validate(stock); positiveID(stock.getStockID());
         write(() -> {
             var current = stocks.findStockByStockID(stock.getStockID());
+            if (current.getRevision() != stock.getRevision())
+                throw new StockConflictException("Dieser Lagerbestand wurde inzwischen geändert. Bitte neu laden und die Änderung erneut prüfen.");
             long managed = checkReservations(current, stock.getReserved());
             if (managed > 0 && (stock.getProductID() != current.getProductID()
                     || !stock.getLocation().equals(current.getLocation()) || stock.isActive() != current.isActive()))

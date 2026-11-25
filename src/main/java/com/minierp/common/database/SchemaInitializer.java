@@ -81,6 +81,19 @@ public final class SchemaInitializer {
                         UNIQUE (orderID, stockID)
                     )
                     """);
+            boolean hasRevision = false;
+            try (var columns = statement.executeQuery("PRAGMA table_info(stocks)")) {
+                while (columns.next()) if ("revision".equals(columns.getString("name"))) hasRevision = true;
+            }
+            if (!hasRevision) statement.execute("ALTER TABLE stocks ADD COLUMN revision INTEGER NOT NULL DEFAULT 0");
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        username TEXT PRIMARY KEY COLLATE NOCASE,
+                        role TEXT NOT NULL CHECK (role IN ('ADMIN','SALES','WAREHOUSE')),
+                        passwordHash BLOB NOT NULL, salt BLOB NOT NULL, iterations INTEGER NOT NULL,
+                        active INTEGER NOT NULL DEFAULT 1
+                    )
+                    """);
             statement.execute("CREATE INDEX IF NOT EXISTS idx_orderAllocations_stock_state ON orderAllocations(stockID, state)");
         }
     }

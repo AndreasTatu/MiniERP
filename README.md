@@ -6,7 +6,14 @@ Kleines ERP mit Java 17, SQLite und einem React-/TypeScript-Frontend. Das Backen
 
 Voraussetzungen: JDK 17 oder neuer, Maven, Node.js 22 und pnpm 11.25.0. Alternativ kann das Backend in IntelliJ über `com.minierp.api.ApiServer` gestartet werden.
 
-Backend im Projektverzeichnis:
+Beim ersten Start benötigt die API ein Passwort für das erste Admin-Konto (mindestens 12 Zeichen). Unter PowerShell kannst du es verdeckt eingeben. Der Standard-Benutzername ist `admin`. Sobald das Konto existiert, startet die API ohne diese Variablen. Ein erneutes Setzen überschreibt keine Zugangsdaten.
+
+```powershell
+$env:MINIERP_ADMIN_PASSWORD = [Net.NetworkCredential]::new('', (Read-Host 'Erstes Admin-Passwort' -AsSecureString)).Password
+try { mvn compile exec:java } finally { Remove-Item Env:MINIERP_ADMIN_PASSWORD }
+```
+
+Backend bei weiteren Starts im Projektverzeichnis:
 
 ```sh
 mvn compile exec:java
@@ -20,7 +27,7 @@ pnpm install
 pnpm dev
 ```
 
-Die Oberfläche läuft standardmäßig auf `http://localhost:5173`, die API auf `http://127.0.0.1:8080/api`. Für eine andere API-Adresse `frontend/.env.example` nach `frontend/.env.local` kopieren und `VITE_API_BASE_URL` anpassen. Die Vite-Konsole zeigt den tatsächlich verwendeten Frontend-Port an.
+Die Oberfläche läuft auf `http://localhost:5173`. Vite leitet `/api` an `http://127.0.0.1:8080` weiter. Öffne die Oberfläche bei Anmeldung und weiterer Arbeit unter demselben Hostnamen. Für abweichende Ports passe das Vite-Proxyziel bzw. den freigegebenen Frontend-Ursprung entsprechend an.
 
 Falls das vorhandene Windows-JDK `Unable to establish loopback connection` mit `Invalid argument: connect` meldet, kann ein verkürzter Temp-Pfad mit `~1` die Ursache sein. Für den betroffenen Terminal-Prozess vor dem Start oder Testlauf einen vollständigen Temp-Pfad setzen:
 
@@ -36,11 +43,32 @@ $env:TMP = $env:TEMP
 | --- | --- | --- |
 | `MINIERP_PORT` | `8080` | API-Port auf dem lokalen Rechner |
 | `MINIERP_DB_URL` | `jdbc:sqlite:miniERP.db` | JDBC-Verbindungsadresse |
-| `VITE_API_BASE_URL` | `http://127.0.0.1:8080/api` | API-Adresse für React |
+| `VITE_API_BASE_URL` | `/api` | API-Pfad für React, standardmäßig über den Proxy |
+| `MINIERP_ADMIN_USER` | `admin` | Benutzername des ersten Admins |
+| `MINIERP_ADMIN_PASSWORD` | – | Passwort nur bei leerer Benutzertabelle erforderlich |
+| `MINIERP_FRONTEND_ORIGIN` | `http://localhost:5173` und `http://127.0.0.1:5173` | Optional genau ein erlaubter Browser-Ursprung inklusive Schema und ggf. Port. Für HTTPS setzt die API das Secure-Attribut am Cookie. |
 
-`SchemaInitializer` legt fehlende Tabellen beim Start an. Er ersetzt keine bestehenden Tabellen und ist noch kein versioniertes Migrationssystem. Die API bearbeitet Anfragen nacheinander, weil die bestehenden DAOs eine JDBC-Verbindung teilen. Sie ist für lokale Entwicklung konfiguriert; Anmeldung und Mehrbenutzerbetrieb sind noch nicht implementiert.
+`SchemaInitializer` legt fehlende Tabellen beim Start an. Er ersetzt keine bestehenden Tabellen und ist noch kein versioniertes Migrationssystem. Die API bearbeitet Anfragen nacheinander, weil die bestehenden DAOs eine JDBC-Verbindung teilen. Sie lauscht auf dem Loopback-Interface. Bei bestehenden Lagertabellen ergänzt sie die Bestandsversion für den Schutz vor veralteten Änderungen.
 
 Lokale Datenbanken, Zugangsdaten in `*.local`, Abhängigkeiten und Build-Ausgaben werden nicht versioniert. Die API erzeugt keine Beispieldaten.
+
+## Anmeldung und Berechtigungen
+
+Nach der Anmeldung kann der Admin unter **Benutzerkonten** weitere Konten anlegen, sperren und freigeben. Gesperrte Konten verlieren ihre laufenden Sitzungen. Die API speichert gesalzene PBKDF2-Passworthashes. Die Sitzung läuft nach acht Stunden, bei Abmeldung oder bei einem API-Neustart ab. Für den gemeinsamen Betrieb hinter einem HTTPS-Reverse-Proxy bleiben Frontend und API unter demselben Ursprung.
+
+| Aktion | Admin | Vertrieb | Lager |
+| --- | --- | --- | --- |
+| Kundenkartei lesen und pflegen | ✓ | ✓ | – |
+| Artikel, Aufträge, Bestände lesen | ✓ | ✓ | ✓ |
+| Artikel und Preise pflegen | ✓ | – | – |
+| Aufträge anlegen, offene Aufträge stornieren | ✓ | ✓ | – |
+| Lagerplätze zuordnen, bestätigen, versenden, Lieferung abschließen | ✓ | – | ✓ |
+| Bestätigte Aufträge stornieren, Lagerbestände pflegen | ✓ | – | ✓ |
+| Benutzerkonten verwalten | ✓ | – | – |
+
+Auftragsdetails enthalten Empfängername und aktuelle Anschrift für den Versand. Für die Anmeldung dient `POST /api/login` mit `username` und `password`. `GET /api/session` liefert Rolle und Rechte, `POST /api/logout` mit `{}` beendet die Sitzung. Alle ERP-Endpunkte benötigen ein gültiges Sitzungscookie. Ohne Sitzung antwortet die API mit 401, bei fehlender Berechtigung mit 403. `GET /api/health` ist öffentlich.
+
+Beim Bearbeiten eines Lagerplatzes sendet das Frontend die zuletzt gelesene `revision` mit. Manuelle Änderungen und Auftragsbuchungen erhöhen die Version. Eine veraltete Eingabe liefert 409. Mit **Aktuellen Stand laden** übernimmt das Formular die aktuellen Werte zur erneuten Bearbeitung.
 
 ## Nutzbare Funktionen
 

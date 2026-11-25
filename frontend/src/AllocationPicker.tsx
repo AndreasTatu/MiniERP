@@ -22,8 +22,10 @@ export function AllocationPicker({ detail, products, busy, error, onConfirm, onC
   detail.items.forEach(item => demand.set(item.productID, (demand.get(item.productID) ?? 0) + item.quantity));
   const candidates = [...stocks].filter(stock => demand.has(stock.productID)).sort((a, b) => a.location.localeCompare(b.location) || a.stockID - b.stockID);
   const entries = candidates.map(stock => ({ stockID: stock.stockID, quantity: Number(chosen[stock.stockID] ?? 0) }));
-  const validRows = entries.every(row => Number.isInteger(row.quantity) && row.quantity >= 0
-    && row.quantity <= candidates.find(stock => stock.stockID === row.stockID)!.quantity - candidates.find(stock => stock.stockID === row.stockID)!.reserved);
+  const validRows = candidates.every(stock => {
+    const quantity = Number(chosen[stock.stockID] ?? 0);
+    return Number.isInteger(quantity) && quantity >= 0 && quantity <= stock.quantity - stock.reserved;
+  });
   const selectedFor = (productID: number) => candidates.filter(stock => stock.productID === productID).reduce((sum, stock) => sum + Number(chosen[stock.stockID] ?? 0), 0);
   const complete = validRows && [...demand].every(([productID, needed]) => selectedFor(productID) === needed);
 
@@ -40,7 +42,15 @@ export function AllocationPicker({ detail, products, busy, error, onConfirm, onC
       return <section className="allocation-product" key={productID}><div className="allocation-product-heading"><b>{products.find(product => product.productID === productID)?.name ?? `Artikel #${productID}`}</b><span className={selected === needed ? 'allocation-complete' : ''}>{selected} / {needed} Stk. ausgewählt</span></div>
         {!locations.length ? <p className="form-hint">Kein aktiver Lagerbestand vorhanden. Bitte zuerst einen passenden Bestand anlegen.</p> : locations.map(stock => {
           const available = stock.quantity - stock.reserved;
-          return <label className="allocation-row" key={stock.stockID}><span className="location-code">{stock.location}</span><span>{available} Stk. verfügbar</span><input type="number" aria-label={`Menge ${stock.location} für ${products.find(product => product.productID === productID)?.name ?? `Artikel ${productID}`}`} min="0" max={available} step="1" required value={chosen[stock.stockID] ?? '0'} disabled={busy || (available <= 0 && !Number(chosen[stock.stockID]))} onChange={event => setChosen(current => ({ ...current, [stock.stockID]: event.target.value }))}/></label>;
+          const fromOtherLocations = selected - Number(chosen[stock.stockID] ?? 0);
+          const maximum = Math.max(0, Math.min(available, needed - fromOtherLocations));
+          return <label className="allocation-row" key={stock.stockID}><span className="location-code">{stock.location}</span><span>{available} Stk. verfügbar</span><input type="number" aria-label={`Menge ${stock.location} für ${products.find(product => product.productID === productID)?.name ?? `Artikel ${productID}`}`} min="0" max={maximum} step="1" required value={chosen[stock.stockID] ?? '0'} disabled={busy || (available <= 0 && !Number(chosen[stock.stockID]))} onChange={event => {
+            const raw = event.currentTarget.value;
+            const quantity = Number(raw);
+            if (Number.isFinite(quantity)) setChosen(current => ({
+              ...current, [stock.stockID]: raw === '' ? '' : String(Math.max(0, Math.min(maximum, Math.trunc(quantity)))),
+            }));
+          }}/></label>;
         })}
       </section>;
     })}

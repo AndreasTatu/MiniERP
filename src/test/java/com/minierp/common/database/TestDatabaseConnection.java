@@ -76,6 +76,7 @@ public class TestDatabaseConnection {
                     location VARCHAR(50),
                     quantity INT,
                     maxStock INT,
+                    revision BIGINT NOT NULL DEFAULT 0,
                     reserved INT,
                     active BOOLEAN,
                     UNIQUE (productID, location),

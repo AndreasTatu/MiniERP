@@ -7,6 +7,10 @@ public class Stock {
     int stockID; //PK
     int productID; //FK from products
     String location; //in form of: A-01-02
+    private long revision;
+    public long getRevision() { return revision; }
+    public void setRevision(long revision) { this.revision = revision; }
+
     int quantity;
     int maxStock;
     int reserved;

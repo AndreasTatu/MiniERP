@@ -33,7 +33,13 @@ public final class ApiServer implements AutoCloseable {
     }
 
     public static ApiServer start(int port, Connection connection) throws IOException, SQLException {
+        return start(port, connection, System.getenv().getOrDefault("MINIERP_ADMIN_USER", "admin"), System.getenv("MINIERP_ADMIN_PASSWORD"));
+    }
+
+    static ApiServer start(int port, Connection connection, String adminName, String initialPassword) throws IOException, SQLException {
         SchemaInitializer.initialize(connection);
+        var accounts = new com.minierp.auth.Accounts(connection);
+        accounts.bootstrap(adminName, initialPassword);
         var customers = new CustomerServiceImpl(new CustomerDAOImpl(connection));
         var productDAO = new ProductDAOImpl(connection);
         var products = new ProductServiceImpl(productDAO);
@@ -47,7 +53,7 @@ public final class ApiServer implements AutoCloseable {
         // The existing DAOs share one JDBC connection. Serialize access until a pool is introduced.
         var executor = Executors.newSingleThreadExecutor();
         server.setExecutor(executor);
-        server.createContext("/api/", new ApiHandler(customers, products, orders, stocks));
+        server.createContext("/api/", new ApiHandler(customers, products, orders, stocks, new AccountRoutes(accounts)));
         server.start();
         return new ApiServer(server, executor);
     }

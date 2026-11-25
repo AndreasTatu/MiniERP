@@ -34,18 +34,18 @@ public class StockDAOImpl implements StockDAO {
 
     @Override
     public void reserveUnits(int stockID, int quantity) throws SQLException {
-        adjust("UPDATE stocks SET reserved = reserved + ? WHERE stockID = ? AND active = true AND quantity - reserved >= ?", stockID, quantity);
+        adjust("UPDATE stocks SET revision = revision + 1, reserved = reserved + ? WHERE stockID = ? AND active = true AND quantity - reserved >= ?", stockID, quantity);
     }
 
     @Override
     public void releaseUnits(int stockID, int quantity) throws SQLException {
-        adjust("UPDATE stocks SET reserved = reserved - ? WHERE stockID = ? AND active = true AND reserved >= ?", stockID, quantity);
+        adjust("UPDATE stocks SET revision = revision + 1, reserved = reserved - ? WHERE stockID = ? AND active = true AND reserved >= ?", stockID, quantity);
     }
 
     @Override
     public void shipReservedUnits(int stockID, int quantity) throws SQLException {
         if (quantity <= 0) throw new IllegalArgumentException("Quantity must be positive.");
-        try (var statement = connection.prepareStatement("UPDATE stocks SET quantity = quantity - ?, reserved = reserved - ? WHERE stockID = ? AND active = true AND quantity >= ? AND reserved >= ?")) {
+        try (var statement = connection.prepareStatement("UPDATE stocks SET revision = revision + 1, quantity = quantity - ?, reserved = reserved - ? WHERE stockID = ? AND active = true AND quantity >= ? AND reserved >= ?")) {
             statement.setInt(1, quantity); statement.setInt(2, quantity); statement.setInt(3, stockID);
             statement.setInt(4, quantity); statement.setInt(5, quantity);
             if (statement.executeUpdate() != 1) throw new StockConflictException("Die reservierte Ware ist nicht mehr vollständig verfügbar. Bitte Lagerbestand prüfen.");
@@ -100,7 +100,7 @@ public class StockDAOImpl implements StockDAO {
     // Read
 
     private final Stock mapResultSetToStock(ResultSet rs) throws SQLException{
-        return new Stock(
+        var stock = new Stock(
                 rs.getInt("StockID"),
                 rs.getInt("productID"),
                 rs.getString("location"),
@@ -108,6 +108,8 @@ public class StockDAOImpl implements StockDAO {
                 rs.getInt("maxStock"),
                 rs.getInt("reserved"),
                 rs.getBoolean("active"));
+        stock.setRevision(rs.getLong("revision"));
+        return stock;
     }
 
     @Override
@@ -196,7 +198,7 @@ public class StockDAOImpl implements StockDAO {
     public void updateFullStock(Stock stock) throws StockNotFoundException, ProductNotFoundException, SQLException{
 
         final String checkSQL = "SELECT 1 FROM products WHERE productID = ?";
-        final String updateSQL = "UPDATE stocks SET productID = ?, location = ?, quantity = ?, maxStock = ?, reserved = ?, active = ? WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET revision = revision + 1, productID = ?, location = ?, quantity = ?, maxStock = ?, reserved = ?, active = ? WHERE stockID = ?";
         final String duplicateSQL = "SELECT 1 FROM stocks WHERE productID = ? AND location = ? AND stockID != ?";
 
         try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
@@ -237,7 +239,7 @@ public class StockDAOImpl implements StockDAO {
     public void updateStockQuantityAndReserved(int stockID, int quantity, int reserved) throws StockNotFoundException, SQLException{
 
         final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
-        final String updateSQL = "UPDATE stocks SET quantity = ?, reserved = ? WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET revision = revision + 1, quantity = ?, reserved = ? WHERE stockID = ?";
 
         try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
             PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){
@@ -268,7 +270,7 @@ public class StockDAOImpl implements StockDAO {
     public void deactivateStock(int stockID) throws StockNotFoundException, SQLException{
 
         final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
-        final String updateSQL = "UPDATE stocks SET active = false WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET revision = revision + 1, active = false WHERE stockID = ?";
 
         try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
             PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){
@@ -296,7 +298,7 @@ public class StockDAOImpl implements StockDAO {
     public void reactivateStock(int stockID) throws StockNotFoundException, SQLException{
 
         final String checkSQL = "SELECT 1 FROM stocks WHERE stockID = ?";
-        final String updateSQL = "UPDATE stocks SET active = true WHERE stockID = ?";
+        final String updateSQL = "UPDATE stocks SET revision = revision + 1, active = true WHERE stockID = ?";
 
         try(PreparedStatement checkStmt = connection.prepareStatement(checkSQL);
             PreparedStatement updateStmt = connection.prepareStatement(updateSQL)){

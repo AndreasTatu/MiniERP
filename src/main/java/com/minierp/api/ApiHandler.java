@@ -1,11 +1,11 @@
 package com.minierp.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.minierp.common.exceptions.*;
+import com.minierp.auth.Accounts.User;
+import com.minierp.auth.Role.Permission;
+import static com.minierp.auth.Role.Permission.*;
+import static com.minierp.api.HttpApi.*;
 import com.minierp.model.customer.Customer;
 import com.minierp.model.product.Product;
 import com.minierp.model.order.Order;
@@ -23,7 +23,6 @@ import com.sun.net.httpserver.HttpHandler;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -32,17 +31,14 @@ import java.util.List;
 import java.util.Map;
 
 final class ApiHandler implements HttpHandler {
-    private static final int MAX_BODY_BYTES = 65_536;
-    private final ObjectMapper json = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
+    private final AccountRoutes auth;
     private final CustomerService customers;
     private final ProductService products;
     private final OrderService orders;
     private final StockService stocks;
 
-    ApiHandler(CustomerService customers, ProductService products, OrderService orders, StockService stocks) {
+    ApiHandler(CustomerService customers, ProductService products, OrderService orders, StockService stocks, AccountRoutes auth) {
+        this.auth = auth;
         this.customers = customers;
         this.products = products;
         this.orders = orders;
@@ -52,13 +48,13 @@ final class ApiHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         try (exchange) {
-            cors(exchange);
-            if (exchange.getRequestMethod().equals("OPTIONS")) {
-                exchange.sendResponseHeaders(204, -1);
-                return;
-            }
             Response response;
             try {
+                auth.checkOrigin(exchange);
+                if (exchange.getRequestMethod().equals("OPTIONS")) {
+                    exchange.sendResponseHeaders(204, -1);
+                    return;
+                }
                 response = route(exchange);
             } catch (CustomerNotFoundException | ProductNotFoundException | OrderNotFoundException | StockNotFoundException exception) {
                 response = error(404, "Der Datensatz wurde nicht gefunden.");
@@ -78,11 +74,11 @@ final class ApiHandler implements HttpHandler {
                 exception.printStackTrace(System.err);
                 response = error(500, "Die Anfrage konnte nicht verarbeitet werden.");
             }
-            if (response.location != null) exchange.getResponseHeaders().set("Location", response.location);
-            byte[] bytes = json.writeValueAsBytes(response.body);
+            if (response.location() != null) exchange.getResponseHeaders().set("Location", response.location());
+            byte[] bytes = json.writeValueAsBytes(response.body());
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
             exchange.getResponseHeaders().set("Cache-Control", "no-store");
-            exchange.sendResponseHeaders(response.status, bytes.length);
+            exchange.sendResponseHeaders(response.status(), bytes.length);
             exchange.getResponseBody().write(bytes);
         }
     }
@@ -94,13 +90,19 @@ final class ApiHandler implements HttpHandler {
             requireMethod(exchange, "GET");
             return new Response(200, Map.of("status", "ok", "service", "MiniERP API"), null);
         }
-        if (path.matches("/api/orders(/[1-9][0-9]*(/status)?)?")) return orderRoute(exchange);
-        if (path.matches("/api/stocks(/[1-9][0-9]*)?")) return stockRoute(exchange);
+        if (path.equals("/api/login")) return auth.login(exchange);
+        User user = auth.requireUser(exchange);
+        if (path.equals("/api/session") || path.equals("/api/logout") || path.equals("/api/users") || path.startsWith("/api/users/"))
+            return auth.route(exchange, user);
+        if (path.matches("/api/orders(/[1-9][0-9]*(/status)?)?")) return orderRoute(exchange, user);
+        if (path.matches("/api/stocks(/[1-9][0-9]*)?")) return stockRoute(exchange, user);
         if (!path.matches("/api/(customers|products)(/[1-9][0-9]*)?")) {
             throw new HttpProblem(404, "API-Endpunkt nicht gefunden.");
         }
         String[] parts = path.split("/");
         boolean customerRoute = parts[2].equals("customers");
+        AccountRoutes.require(user, customerRoute ? (method.equals("GET") ? CUSTOMERS_READ : CUSTOMERS_WRITE)
+                : (method.equals("GET") ? PRODUCTS_READ : PRODUCTS_WRITE));
         if (parts.length == 3) {
             requireMethod(exchange, "GET", "POST");
             if (method.equals("GET")) return new Response(200,
@@ -142,11 +144,12 @@ final class ApiHandler implements HttpHandler {
         return new Response(200, current, null);
     }
 
-    private Response orderRoute(HttpExchange exchange) throws IOException {
+    private Response orderRoute(HttpExchange exchange, User user) throws IOException {
         String path = exchange.getRequestURI().getPath();
         String[] parts = path.split("/");
         if (parts.length == 3) {
             requireMethod(exchange, "GET", "POST");
+            AccountRoutes.require(user, exchange.getRequestMethod().equals("GET") ? ORDERS_READ : ORDERS_CREATE);
             if (exchange.getRequestMethod().equals("GET")) return new Response(200, orders.findAllOrders(), null);
             var request = body(exchange, OrderRequest.class);
             var customer = customers.findCustomerByID(request.customerID);
@@ -165,18 +168,37 @@ final class ApiHandler implements HttpHandler {
         if (parts.length == 5) {
             requireMethod(exchange, "PATCH");
             var request = body(exchange, StatusRequest.class);
+            if (request.status == null) throw new IllegalArgumentException("Ein Auftragsstatus ist erforderlich.");
+            Permission permission = switch (request.status) {
+                case CONFIRMED -> CONFIRM;
+                case SHIPPED -> SHIP;
+                case DELIVERED -> DELIVER;
+                case CANCELLED -> {
+                    OrderStatus current = orders.findOrderByID(id).getOrderStatus();
+                    // Repeating a completed cancellation does not release stock again.
+                    boolean openOrSalesRetry = current == OrderStatus.PENDING
+                            || (current == OrderStatus.CANCELLED && user.role().permissions.contains(CANCEL_OPEN));
+                    yield openOrSalesRetry ? CANCEL_OPEN : CANCEL_CONFIRMED;
+                }
+                case PENDING -> ORDERS_CREATE;
+            };
+            AccountRoutes.require(user, permission);
             orders.updateOrderStatus(id, request.status, request.allocations);
             return new Response(200, orders.findOrderByID(id), null);
         }
         requireMethod(exchange, "GET");
+        AccountRoutes.require(user, ORDERS_READ);
         return new Response(200, orderDetail(id), null);
     }
 
     private OrderDetail orderDetail(int id) {
-        return new OrderDetail(orders.findOrderByID(id), orders.findAllOrderItemsByOrder(id), orders.findAllocationsByOrder(id));
+        var order = orders.findOrderByID(id);
+        var recipient = customers.findCustomerByID(order.getCustomerID());
+        return new OrderDetail(order, orders.findAllOrderItemsByOrder(id), orders.findAllocationsByOrder(id), recipient.getName(), recipient.getAddress());
     }
 
-    private Response stockRoute(HttpExchange exchange) throws IOException, SQLException {
+    private Response stockRoute(HttpExchange exchange, User user) throws IOException, SQLException {
+        AccountRoutes.require(user, exchange.getRequestMethod().equals("GET") ? STOCKS_READ : STOCKS_WRITE);
         String path = exchange.getRequestURI().getPath();
         String[] parts = path.split("/");
         if (parts.length == 3) {
@@ -204,50 +226,11 @@ final class ApiHandler implements HttpHandler {
         long orderReserved = stocks.findOrderReservedQuantity(stock.getStockID());
         if (orderReserved > stock.getReserved()) throw new StockConflictException("Die Lagerreservierungen sind inkonsistent. Bitte den Lagerbestand prüfen.");
         return new StockView(stock.getStockID(), stock.getProductID(), stock.getLocation(), stock.getQuantity(),
-                stock.getMaxStock(), stock.getReserved(), stock.isActive(), orderReserved, stock.getReserved() - orderReserved);
-    }
-
-    private <T> T body(HttpExchange exchange, Class<T> type) throws IOException {
-        String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
-        if (contentType == null || !contentType.split(";", 2)[0].trim().equalsIgnoreCase("application/json")) {
-            throw new HttpProblem(415, "Content-Type muss application/json sein.");
-        }
-        byte[] bytes = exchange.getRequestBody().readNBytes(MAX_BODY_BYTES + 1);
-        if (bytes.length > MAX_BODY_BYTES) throw new HttpProblem(413, "Die Anfrage ist zu groß.");
-        T request = json.readValue(bytes, type);
-        if (request == null) throw new IllegalArgumentException("Die Anfrage darf nicht leer sein.");
-        return request;
-    }
-
-    private void requireMethod(HttpExchange exchange, String... allowed) {
-        for (String method : allowed) if (exchange.getRequestMethod().equals(method)) return;
-        exchange.getResponseHeaders().set("Allow", String.join(", ", allowed) + ", OPTIONS");
-        throw new HttpProblem(405, "HTTP-Methode wird nicht unterstützt.");
-    }
-
-    private void cors(HttpExchange exchange) {
-        String origin = exchange.getRequestHeaders().getFirst("Origin");
-        if (origin != null) {
-            try {
-                URI uri = URI.create(origin);
-                if ("http".equals(uri.getScheme()) && ("localhost".equals(uri.getHost()) || "127.0.0.1".equals(uri.getHost()))) {
-                    exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
-                    exchange.getResponseHeaders().set("Vary", "Origin");
-                }
-            } catch (IllegalArgumentException ignored) { /* An invalid origin receives no CORS permission. */ }
-        }
-        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+                stock.getMaxStock(), stock.getReserved(), stock.isActive(), orderReserved, stock.getReserved() - orderReserved, stock.getRevision());
     }
 
     private Response error(int status, String message) {
         return new Response(status, Map.of("error", message), null);
-    }
-
-    private record Response(int status, Object body, String location) {}
-    private static final class HttpProblem extends RuntimeException {
-        final int status;
-        HttpProblem(int status, String message) { super(message); this.status = status; }
     }
 
     record CustomerRequest(String name, String address, LocalDate birthdate, String email, String phone) {
@@ -266,14 +249,17 @@ final class ApiHandler implements HttpHandler {
     record OrderRequest(int customerID, BigDecimal discount, BigDecimal tax, List<OrderLineRequest> items) {}
     record OrderLineRequest(int productID, int quantity) {}
     record StatusRequest(OrderStatus status, List<StockSelection> allocations) {}
-    record OrderDetail(Order order, List<OrderItem> items, List<OrderAllocation> allocations) {}
+    record OrderDetail(Order order, List<OrderItem> items, List<OrderAllocation> allocations, String recipientName, String recipientAddress) {}
     record StockView(int stockID, int productID, String location, int quantity, int maxStock,
-                     int reserved, boolean active, long orderReserved, long manualReserved) {}
-    record StockRequest(int productID, String location, Integer quantity, Integer maxStock, Integer reserved) {
+                     int reserved, boolean active, long orderReserved, long manualReserved, long revision) {}
+    record StockRequest(int productID, String location, Integer quantity, Integer maxStock, Integer reserved, Long revision) {
         Stock toStock(int id, boolean active) {
             if (quantity == null || maxStock == null || reserved == null)
                 throw new IllegalArgumentException("Bestand, Kapazität und Reservierung sind erforderlich.");
-            return new Stock(id, productID, location, quantity, maxStock, reserved, active);
+            var stock = new Stock(id, productID, location, quantity, maxStock, reserved, active);
+            if (id != 0 && (revision == null || revision < 0)) throw new IllegalArgumentException("Die gelesene Bestandsversion ist erforderlich.");
+            if (revision != null) stock.setRevision(revision);
+            return stock;
         }
     }
 }

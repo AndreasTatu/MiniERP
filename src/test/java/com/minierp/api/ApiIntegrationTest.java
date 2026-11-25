@@ -18,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Exercises the HTTP boundary, services and actual SQLite persistence together. */
 class ApiIntegrationTest {
+    private final String testPassword = java.util.UUID.randomUUID().toString();
+    private String cookie;
     private Connection connection;
     private ApiServer api;
     private final HttpClient client = HttpClient.newHttpClient();
@@ -26,7 +28,8 @@ class ApiIntegrationTest {
     @BeforeEach
     void start() throws Exception {
         connection = DriverManager.getConnection("jdbc:sqlite::memory:");
-        api = ApiServer.start(0, connection);
+        api = ApiServer.start(0, connection, "admin", testPassword);
+        signIn("admin");
     }
 
     @AfterEach
@@ -87,7 +90,7 @@ class ApiIntegrationTest {
         assertEquals(204, options.statusCode());
         assertEquals("http://localhost:5173", options.headers().firstValue("Access-Control-Allow-Origin").orElseThrow());
         var unsupported = client.send(HttpRequest.newBuilder(uri("/products"))
-                .header("Content-Type", "text/plain").POST(HttpRequest.BodyPublishers.ofString("{}")).build(), HttpResponse.BodyHandlers.ofString());
+                .header("Cookie", cookie).header("Content-Type", "text/plain").POST(HttpRequest.BodyPublishers.ofString("{}")).build(), HttpResponse.BodyHandlers.ofString());
         assertEquals(415, unsupported.statusCode());
     }
 
@@ -105,13 +108,13 @@ class ApiIntegrationTest {
         assertEquals(409, request("POST", "/stocks", body).statusCode());
         assertEquals(400, request("POST", "/stocks", body.replace(":10", ":60")).statusCode());
         assertEquals(400, request("POST", "/stocks", body.replace("\"reserved\":2", "\"reserved\":11")).statusCode());
-        var updated = request("PUT", "/stocks/" + id, body.replace(":10", ":15").replace("a-01-02", "B-02-03"));
+        var updated = request("PUT", "/stocks/" + id, body.replace("}", ",\"revision\":0}").replace(":10", ":15").replace("a-01-02", "B-02-03"));
         assertEquals(200, updated.statusCode(), updated.body());
         assertEquals(15, json.readTree(updated.body()).get("quantity").asInt());
         assertEquals("B-02-03", json.readTree(request("GET", "/stocks/" + id, null).body()).get("location").asText());
         var second = request("POST", "/stocks", body);
         assertEquals(201, second.statusCode());
-        assertEquals(409, request("PUT", "/stocks/" + id, body).statusCode());
+        assertEquals(409, request("PUT", "/stocks/" + id, body.replace("}", ",\"revision\":1}")).statusCode());
         assertEquals(2, json.readTree(request("GET", "/stocks", null).body()).size());
         var stockDAO = new StockDAOImpl(connection);
         stockDAO.deactivateStock(id);
@@ -150,7 +153,7 @@ class ApiIntegrationTest {
         var reservedStock = json.readTree(request("GET", "/stocks/" + stockID, null).body());
         assertEquals(2, reservedStock.get("orderReserved").asInt());
         assertEquals(1, reservedStock.get("manualReserved").asInt());
-        var illegalEdit = request("PUT", "/stocks/" + stockID, "{\"productID\":" + productID + ",\"location\":\"A-01-01\",\"quantity\":10,\"maxStock\":20,\"reserved\":1}");
+        var illegalEdit = request("PUT", "/stocks/" + stockID, "{\"productID\":" + productID + ",\"location\":\"A-01-01\",\"quantity\":10,\"maxStock\":20,\"reserved\":1,\"revision\":" + reservedStock.get("revision") + "}");
         assertEquals(409, illegalEdit.statusCode(), illegalEdit.body());
         assertEquals(400, request("POST", "/orders", body.replace("\"quantity\":2", "\"quantity\":0")).statusCode());
         assertEquals(404, request("POST", "/orders", body.replace("\"customerID\":" + customerID, "\"customerID\":999")).statusCode());
@@ -158,10 +161,87 @@ class ApiIntegrationTest {
         assertEquals(200, request("PUT", "/products/" + productID, """
                 {"name":"Artikel","description":null,"weight":"250","price":"60.00","minStockThreshold":3}
                 """).statusCode());
+        assertEquals(200, request("PATCH", "/orders/" + id + "/status", "{\"status\":\"SHIPPED\"}").statusCode());
+        var stale = request("PUT", "/stocks/" + stockID, "{\"productID\":" + productID + ",\"location\":\"A-01-01\",\"quantity\":10,\"maxStock\":30,\"reserved\":3,\"revision\":" + reservedStock.get("revision") + "}");
+        assertEquals(409, stale.statusCode(), stale.body());
+        var afterConflict = json.readTree(request("GET", "/stocks/" + stockID, null).body());
+        assertEquals(8, afterConflict.get("quantity").asInt());
+        assertEquals(1, afterConflict.get("manualReserved").asInt());
         var historical = json.readTree(request("GET", "/orders/" + id, null).body());
         assertEquals(50, historical.get("items").get(0).get("unitPrice").asInt());
         assertEquals(107.10, historical.get("order").get("totalPrice").asDouble());
         assertEquals(1, json.readTree(request("GET", "/orders", null).body()).size());
+    }
+
+    @Test
+    void rolesControlDataAndOrderHandoff() throws Exception {
+        int product = createProduct();
+        addUser("sales", "SALES");
+        addUser("warehouse", "WAREHOUSE");
+        signIn("sales");
+        assertEquals(403, request("GET", "/users", null).statusCode());
+        assertEquals(403, request("POST", "/products", "{}").statusCode());
+        assertEquals(403, request("POST", "/stocks", "{}").statusCode());
+        var customer = request("POST", "/customers", "{\"name\":\"Ada\",\"address\":\"Berlin\",\"email\":\"a@example.test\",\"phone\":\"123\"}");
+        assertEquals(201, customer.statusCode());
+        String input = "{\"customerID\":" + json.readTree(customer.body()).get("customerID") + ",\"items\":[{\"productID\":" + product + ",\"quantity\":1}]}";
+        int id = json.readTree(request("POST", "/orders", input).body()).at("/order/orderID").asInt();
+        String status = "/orders/" + id + "/status";
+        assertEquals(403, request("PATCH", status, "{\"status\":\"CONFIRMED\"}").statusCode());
+        signIn("warehouse");
+        for (String path : new String[]{"/customers", "/customers/1", "/users"})
+            assertEquals(403, request("GET", path, null).statusCode(), path);
+        assertEquals(403, request("POST", "/orders", input).statusCode());
+        assertEquals(403, request("PATCH", status, "{\"status\":\"CANCELLED\"}").statusCode());
+        var detail = json.readTree(request("GET", "/orders/" + id, null).body());
+        assertEquals("Berlin", detail.get("recipientAddress").asText());
+        var stock = request("POST", "/stocks", "{\"productID\":" + product + ",\"location\":\"A-01-01\",\"quantity\":1,\"reserved\":0,\"maxStock\":5}");
+        assertEquals(201, stock.statusCode());
+        String selection = "{\"status\":\"CONFIRMED\",\"allocations\":[{\"stockID\":" + json.readTree(stock.body()).get("stockID") + ",\"quantity\":1}]}";
+        assertEquals(200, request("PATCH", status, selection).statusCode());
+        signIn("sales");
+        assertEquals(403, request("PATCH", status, "{\"status\":\"CANCELLED\"}").statusCode());
+        int second = json.readTree(request("POST", "/orders", input).body()).at("/order/orderID").asInt();
+        String cancelPath = "/orders/" + second + "/status";
+        for (int attempt = 0; attempt < 2; attempt++)
+            assertEquals(200, request("PATCH", cancelPath, "{\"status\":\"CANCELLED\"}").statusCode());
+        signIn("warehouse");
+        assertEquals(200, request("PATCH", status, "{\"status\":\"SHIPPED\"}").statusCode());
+        assertEquals(200, request("PATCH", status, "{\"status\":\"DELIVERED\"}").statusCode());
+    }
+
+    @Test
+    void loginLogoutAndAccountSuspensionControlSessionLifetime() throws Exception {
+        String adminCookie = cookie;
+        cookie = null;
+        assertEquals(401, request("GET", "/stocks", null).statusCode());
+        assertEquals(401, request("POST", "/login", "{\"username\":\"admin\",\"password\":\"incorrect\"}").statusCode());
+        cookie = adminCookie;
+        addUser("employee", "SALES");
+        assertEquals(409, request("PATCH", "/users/admin", "{\"active\":false}").statusCode());
+        cookie = null;
+        signIn("employee");
+        String employeeCookie = cookie;
+        cookie = adminCookie;
+        assertEquals(200, request("PATCH", "/users/employee", "{\"active\":false}").statusCode());
+        cookie = employeeCookie;
+        assertEquals(401, request("GET", "/session", null).statusCode());
+        cookie = adminCookie;
+        assertEquals(200, request("POST", "/logout", "{}").statusCode());
+        assertEquals(401, request("GET", "/session", null).statusCode());
+    }
+
+    private void addUser(String name, String role) throws Exception {
+        String payload = json.writeValueAsString(java.util.Map.of("username", name, "password", testPassword, "role", role));
+        assertEquals(201, request("POST", "/users", payload).statusCode());
+    }
+
+    private void signIn(String name) throws Exception {
+        var response = request("POST", "/login", json.writeValueAsString(java.util.Map.of("username", name, "password", testPassword)));
+        assertEquals(200, response.statusCode(), response.body());
+        String header = response.headers().firstValue("Set-Cookie").orElseThrow();
+        assertTrue(header.contains("HttpOnly"));
+        cookie = header.split(";", 2)[0];
     }
 
     private int createProduct() throws Exception {
@@ -175,6 +255,7 @@ class ApiIntegrationTest {
     private URI uri(String path) { return URI.create("http://127.0.0.1:" + api.port() + "/api" + path); }
     private HttpResponse<String> request(String method, String path, String body) throws Exception {
         var builder = HttpRequest.newBuilder(uri(path));
+        if (cookie != null) builder.header("Cookie", cookie);
         if (body != null) builder.header("Content-Type", "application/json");
         return client.send(builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
     }

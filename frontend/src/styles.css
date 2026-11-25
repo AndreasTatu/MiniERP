@@ -202,3 +202,7 @@ h3 { margin: 0; font-size: 12px; font-weight: 600; }
 .legacy-allocation-note { background: #fff7e9; border: 1px solid #f0e0c6; border-radius: 7px; padding: 13px; font-size: 11px; color: #b29464; line-height: 1.6; margin-top: 22px; }
 .reservation-breakdown { display: block; font-size: 8px; color: #a1adbf; white-space: nowrap; margin-top: 4px; }
 @media (max-width: 520px) { .allocation-heading { flex-direction: column; } .allocation-product-heading { flex-wrap: wrap; } .allocation-row { grid-template-columns: 1fr 1fr 65px; gap: 7px; } }
+
+.login-screen { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.account-form { display: grid; gap: 16px; width: min(100%, 440px); padding: 28px; margin: 18px 0; }
+.account-form h1, .account-form h2 { margin: 0; }
